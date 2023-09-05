@@ -3,10 +3,7 @@
 
 Unofficial Simple integration exposing devices managed by Nexwell/Nexo system using Multimedia Card.
 
-<span style="color:red"> 
- $${\color{red}Red}$$
 !!! USE ON YOUR OWN RISK !!!
-</span>
 
 ### Working Items
 
