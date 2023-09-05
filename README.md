@@ -11,7 +11,7 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
 
 ## Deployment
 
-To deploy this project run
+To deploy this project:
 
  1. Copy nexo folder into your Home Assistant custom folder
  
