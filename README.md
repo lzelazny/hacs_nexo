@@ -7,28 +7,38 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
 !!! USE ON YOUR OWN RISK !!!
 </span>
 
+### Working Items
+
+ - Lights (on/off)
+
 ## Deployment
 
 To deploy this project run
 
-
-```bash
-  1. Copy nexo folder into your home assistion custom folder
+ 1. Copy nexo folder into your Home Assistant custom folder
+ 
   ![folder structure](img/folder_structure.jpg)
-  2. Restart HA 
-  3. Goto setting -> add integration -> nexo 
-  4. Put ip address of your multimedia card.
-  5. Enjoy
-```
 
+  2. Restart HA 
+  3. Goto Settings -> Add Integration -> nexo 
+
+![add integration](img/add_integration.jpg)
+
+  4. Put ip address of your multimedia card.
+
+![config](img/config_wizard.jpg)
+
+  5. Enjoy
+
+![enjoy](img/enjoy.jpg)
 
 ## Roadmap
 
-- Test sensors
+- Sensors
 
-- Include switches
+- Switches
 
-- Include roller blinds
+- Roller blinds
 
 
 ## License
