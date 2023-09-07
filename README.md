@@ -3,9 +3,7 @@
 
 Unofficial Simple integration exposing devices managed by Nexwell/Nexo system using Multimedia Card.
 
-<span style="color:red"> 
 !!! USE ON YOUR OWN RISK !!!
-</span>
 
 ### Working Items
 
@@ -13,9 +11,9 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
 
 ## Deployment
 
-To deploy this project run
+To deploy this project:
 
- 1. Copy nexo folder into your Home Assistant custom folder
+ 1. Copy nexo folder into your Home Assistant custom_components
  
   ![folder structure](img/folder_structure.jpg)
 
