@@ -65,6 +65,3 @@ class HANexoLight(LightEntity):
         """Entity being removed from hass."""
         # The opposite of async_added_to_hass. Remove any registered call backs here.
         self._nexolight.remove_callback(self.async_update_state)
-
-    # async def async_update(self) -> None:
-    #   self._attr_is_on = self._nexolight.is_on()

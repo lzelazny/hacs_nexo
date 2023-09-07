@@ -34,17 +34,16 @@ async def async_setup_entry(
 
 
 class HANexoPIR(BinarySensorEntity):
-    """Home Assiant Nexo output"""
+    """Home Assistant Nexo output"""
 
     def __init__(self, nexo_sensor) -> None:
         super().__init__()
         self._nexo_sensor = nexo_sensor
-        # self._name = nexo_sensor.name
-        # self._attr_is_on = self._nexo_sensor.is_on()
+        self._attr_is_on = self._nexo_sensor.is_on()
 
     @property
     def unique_id(self) -> str:
-        """Return the Id of this Nexo output."""
+        """Return the id of this Nexo output."""
         return str(self._nexo_sensor.id)
 
     @property

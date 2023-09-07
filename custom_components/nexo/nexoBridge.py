@@ -1,9 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
+from typing import Callable, Final
 import threading
 import asyncio
 import websocket
 import json
 import time
+import logging
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
@@ -24,6 +26,8 @@ from .nexoEntities import (
     NexoSensor,
     NexoTemperature,
 )
+
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 class NexoBridge:
@@ -71,6 +75,9 @@ class NexoBridge:
 
     def on_message(self, webSocet, message):
         json_message = json.loads(message)
+
+        _LOGGER.debug(json_message)
+
         if json_message["op"] == "initial_data":
             self.on_message_initial_data(json_message)
         if json_message["op"] == "data_update":

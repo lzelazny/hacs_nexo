@@ -10,5 +10,5 @@
   "requirements": ["websocket-client==1.5.3"],
   "ssdp": [],
   "zeroconf": [],
-  "version": "1.0.0"
+  "version": "1.0.1"
 }

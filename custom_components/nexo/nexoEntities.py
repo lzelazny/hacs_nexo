@@ -109,7 +109,13 @@ class NexoSensor(NexoResource):
         super().__init__(web_socet, *args, **kwargs)
 
     def is_on(self) -> bool:
-        return False if self.state == 101 else True
+        match self.state["value"]:
+            case 101:
+                return False
+            case 102:
+                return True
+            case _:
+                return None
 
 
 class NexoAnalogSensor(NexoSensor):
