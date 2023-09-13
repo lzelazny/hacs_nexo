@@ -11,7 +11,12 @@ from .const import DOMAIN
 from .nexoBridge import NexoBridge
 
 _LOGGER: Final = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.LIGHT,
+    Platform.BINARY_SENSOR,
+    Platform.SWITCH,
+    Platform.COVER,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

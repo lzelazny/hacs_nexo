@@ -115,8 +115,8 @@ class NexoBridge:
         print("### closed ###")
 
     def add_resource(self, nexo_resource):
-        type = nexo_resource["type"]
-        match type:
+        nexo_resource_type = nexo_resource["type"]
+        match nexo_resource_type:
             case "light":
                 obj = NexoLight(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
@@ -132,40 +132,40 @@ class NexoBridge:
                 self.resources[obj.id] = obj
                 return obj
 
-            case "temperature":
-                obj = NexoTemperature(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
-
-            #   case "blind":
-            #      obj = NexoBlind(self.ws, **nexo_resource)
-            #     self.resources[obj.id] = obj
+            # case "temperature":
+            #    obj = NexoTemperature(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
             #    return obj
 
-            case "group_blind":
-                obj = NexoBlindGroup(self.ws, **nexo_resource)
+            case "blind":
+                obj = NexoBlind(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 
-            case "group_dimmer":
-                obj = NexoGroupDimmer(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            # case "group_blind":
+            #    obj = NexoBlindGroup(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
-            case "analogsensor":
-                obj = NexoAnalogSensor(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            # case "group_dimmer":
+            #    obj = NexoGroupDimmer(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
-            case "gate":
-                obj = NexoGate(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            # case "analogsensor":
+            #    obj = NexoAnalogSensor(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
-            case "partition":
-                obj = NexoPartition(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            # case "gate":
+            #    obj = NexoGate(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
+
+            # case "partition":
+            #   obj = NexoPartition(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
             case _:
                 print(f"not supported {type}")

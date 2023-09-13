@@ -51,7 +51,7 @@ class NexoGate(NexoResource):
 
 
 class NexoLight(NexoResource):
-    def __init__(self, web_socet, *args, **kwargs):
+    def __init__(self, web_socet, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
 
     def is_on(self) -> bool:
@@ -78,7 +78,7 @@ class NexoLight(NexoResource):
 
 
 class NexoOutput(NexoResource):
-    def __init__(self, web_socet, *args, **kwargs):
+    def __init__(self, web_socet, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
 
     def is_on(self) -> bool:
@@ -105,7 +105,7 @@ class NexoOutput(NexoResource):
 
 
 class NexoSensor(NexoResource):
-    def __init__(self, web_socet, blocked=False, index=0, *args, **kwargs):
+    def __init__(self, web_socet, blocked=False, index=0, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
 
     def is_on(self) -> bool:
@@ -119,12 +119,12 @@ class NexoSensor(NexoResource):
 
 
 class NexoAnalogSensor(NexoSensor):
-    def __init__(self, web_socet, *args, **kwargs):
+    def __init__(self, web_socet, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
 
 
 class NexoTemperature(NexoResource):
-    def __init__(self, web_socet, max, min, mode, *args, **kwargs):
+    def __init__(self, web_socet, max, min, mode, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
         self.max = max
         self.min = min
@@ -132,26 +132,44 @@ class NexoTemperature(NexoResource):
 
 
 class NexoBlind(NexoResource):
-    def __init__(self, web_socet, time_down, time_pulse, time_up, *args, **kwargs):
+    def __init__(
+        self, web_socet, time_down, time_pulse, time_up, *args, **kwargs
+    ) -> None:
         super().__init__(web_socet, *args, **kwargs)
         self.time_down = time_down
         self.time_pulse = time_pulse
         self.time_up = time_up
 
+    def is_opened(self) -> bool:
+        match self.state["blind_op"]:
+            case 0:
+                return False
+            case 1:
+                return True
+            case _:
+                return None
+
+    def is_inMove(self) -> bool:
+        match self.state["blind_op"]:
+            case 2:
+                return True
+            case _:
+                return None
+
 
 class NexoBlindGroup(NexoResource):
-    def __init__(self, web_socet, ios, *args, **kwargs):
+    def __init__(self, web_socet, ios, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
         self.ios = ios
 
 
 class NexoGroupDimmer(NexoResource):
-    def __init__(self, web_socet, ios, *args, **kwargs):
+    def __init__(self, web_socet, ios, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
         self.ios = ios
 
 
 class NexoPartition(NexoResource):
-    def __init__(self, web_socet, mode, *args, **kwargs):
+    def __init__(self, web_socet, mode, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
         self.mode = mode
