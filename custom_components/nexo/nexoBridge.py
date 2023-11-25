@@ -6,15 +6,18 @@ import websocket
 import json
 import time
 import logging
+import pkg_resources;
+import rel;
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
 NEXO_RESOURCE_TYPE_SENSOR = "sensor"
 NEXO_RESOURCE_TYPE_ANALOG_SENSOR = "analogsensor"
 NEXO_RESOURCE_TYPE_LIGHT = "light"
+NEXO_INIT_TIMEOUT = 10
+NEXO_RECONET_TIMEOUT = 5
 
 from .nexoEntities import (
-    NexoAnalogSensor,
     NexoBlind,
     NexoBlindGroup,
     NexoGate,
@@ -23,7 +26,8 @@ from .nexoEntities import (
     NexoOutput,
     NexoPartition,
     NexoResource,
-    NexoSensor,
+    NexoBinarySensor,
+    NexoAnalogSensor,
     NexoTemperature,
 )
 
@@ -40,10 +44,19 @@ class NexoBridge:
         self._loop = asyncio.get_running_loop()
 
     def on_open(self, ws):
-        print("Opened connection")
+        _LOGGER.info("Nexo integration started")
+
+    async def wait_for_initial_resouces_load(self, timeout):
+        t = timeout
+        while self.initialized is False and t > 0:
+            await asyncio.sleep(1)
+            t = t - 1
 
     async def connect(self):
-        # websocket.enableTrace(traceable=True)
+        _LOGGER.info("Connecting... %s:%s", self.local_ip, 8766)
+        _LOGGER.info("Reconect Timeout %s", NEXO_RECONET_TIMEOUT)
+        _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
+        #websocket.enableTrace(traceable=True)
         self.ws = websocket.WebSocketApp(
             f"ws://{self.local_ip}:8766/",
             on_open=self.on_open,
@@ -51,20 +64,26 @@ class NexoBridge:
             on_error=self.on_error,
             on_close=self.on_close,
         )
-
-        # wst = threading.Thread(target=self.ws.run_forever)
-        # wst.daemon = True
-        # wst.start()
-
-        # asyncio.run(self.ws.run_forever(reconnect=10))
-
+        self.ws.run_forever(dispatcher=rel, reconnect=NEXO_RECONET_TIMEOUT)
         executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(self.ws.run_forever)
-        timeout = 5
+        executor.submit(rel.dispatch)
+        await self.wait_for_initial_resouces_load(NEXO_INIT_TIMEOUT)
 
-        while self.initialized is False and timeout > 0:
-            await asyncio.sleep(1)
-            timeout = timeout - 1
+    def on_message(self, webSocet, message):
+        _LOGGER.debug("Message: %s", message)
+        json_message = json.loads(message)
+
+        if json_message["op"] == "initial_data":
+            self.on_message_initial_data(json_message)
+
+        if json_message["op"] == "data_update":
+            if (self.initialized):
+                self.on_message_data_update(json_message)
+
+    def on_message_initial_data(self, json_message):
+        if len(self.raw_data_model.keys()) == 0:
+            self.raw_data_model = json_message
+            self.update_resources()
 
     def update_resources(self):
         self.initialized = False
@@ -73,20 +92,6 @@ class NexoBridge:
             self.add_resource(self.raw_data_model["resources"][resource_id])
         self.initialized = True
 
-    def on_message(self, webSocet, message):
-        json_message = json.loads(message)
-
-        _LOGGER.debug(json_message)
-
-        if json_message["op"] == "initial_data":
-            self.on_message_initial_data(json_message)
-        if json_message["op"] == "data_update":
-            self.on_message_data_update(json_message)
-
-    def on_message_initial_data(self, json_message):
-        if len(self.raw_data_model.keys()) == 0:
-            self.raw_data_model = json_message
-            self.update_resources()
 
     def on_message_data_update(self, json_message):
         for res in json_message["resources"]:
@@ -109,10 +114,10 @@ class NexoBridge:
         )
 
     def on_error(self, webSocet, error):
-        print(error)
+        _LOGGER.error(error)
 
     def on_close(self, webSocet, close_status_code, close_msg):
-        print("### closed ###")
+        _LOGGER.info("Connection closed")
 
     def add_resource(self, nexo_resource):
         type = nexo_resource["type"]
@@ -123,7 +128,12 @@ class NexoBridge:
                 return obj
 
             case "sensor":
-                obj = NexoSensor(self.ws, **nexo_resource)
+                obj = NexoBinarySensor(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+                return obj
+
+            case "analogsensor":
+                obj = NexoAnalogSensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 
@@ -149,11 +159,6 @@ class NexoBridge:
 
             case "group_dimmer":
                 obj = NexoGroupDimmer(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
-
-            case "analogsensor":
-                obj = NexoAnalogSensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 

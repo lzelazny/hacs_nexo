@@ -44,11 +44,9 @@ class NexoResource:
             )
             asyncio.run_coroutine_threadsafe(self.wrapper(callback), _loop)
 
-
 class NexoGate(NexoResource):
     def __init__(self, web_socet, *args, **kwargs) -> None:
         super().__init__(web_socet, *args, **kwargs)
-
 
 class NexoLight(NexoResource):
     def __init__(self, web_socet, *args, **kwargs):
@@ -76,7 +74,6 @@ class NexoLight(NexoResource):
         toggle_state = 1 if self.state["is_on"] > 0 else 0
         return f'{{"type": "resource", "id": {self.id}, "cmd":{{"operation":{toggle_state} }} }}'
 
-
 class NexoOutput(NexoResource):
     def __init__(self, web_socet, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
@@ -103,8 +100,7 @@ class NexoOutput(NexoResource):
     def toggle(self):
         self.web_socet.send(self._get_toggle_message())
 
-
-class NexoSensor(NexoResource):
+class NexoBinarySensor(NexoResource):
     def __init__(self, web_socet, blocked=False, index=0, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
 
@@ -117,11 +113,12 @@ class NexoSensor(NexoResource):
             case _:
                 return None
 
-
-class NexoAnalogSensor(NexoSensor):
-    def __init__(self, web_socet, *args, **kwargs):
+class NexoAnalogSensor(NexoResource):
+    def __init__(self, web_socet, blocked=False, index=0, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
 
+    def get_value(self) -> int:
+        return self.state["value"]
 
 class NexoTemperature(NexoResource):
     def __init__(self, web_socet, max, min, mode, *args, **kwargs):
@@ -130,7 +127,6 @@ class NexoTemperature(NexoResource):
         self.min = min
         self.mode = mode
 
-
 class NexoBlind(NexoResource):
     def __init__(self, web_socet, time_down, time_pulse, time_up, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
@@ -138,18 +134,15 @@ class NexoBlind(NexoResource):
         self.time_pulse = time_pulse
         self.time_up = time_up
 
-
 class NexoBlindGroup(NexoResource):
     def __init__(self, web_socet, ios, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
         self.ios = ios
 
-
 class NexoGroupDimmer(NexoResource):
     def __init__(self, web_socet, ios, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)
         self.ios = ios
-
 
 class NexoPartition(NexoResource):
     def __init__(self, web_socet, mode, *args, **kwargs):
