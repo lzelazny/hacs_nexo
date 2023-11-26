@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 
-from .nexoEntities import NexoOutput
+from nexoEntities.nexoOutput import NexoOutput
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -20,21 +20,21 @@ async def async_setup_entry(
 ) -> None:
     """Set up"""
     nexo = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(HANexoOutput(l) for l in nexo.get_resources_by_type(NexoOutput))
+    async_add_entities(HANexoOutput(switch) for switch in nexo.get_resources_by_type(NexoOutput))
 
 
 class HANexoOutput(SwitchEntity):
-    """Home Assiant Nexo output"""
+    """Home Assistant Nexo output"""
 
-    def __init__(self, nexoOutput) -> None:
+    def __init__(self, nexo_output) -> None:
         super().__init__()
-        self._nexoOutput = nexoOutput
-        self._name = nexoOutput.name
+        self._nexoOutput = nexo_output
+        self._name = nexo_output.name
         self._attr_is_on = self._nexoOutput.is_on()
 
     @property
     def unique_id(self) -> str:
-        """Return the Id of this Nexo output."""
+        """Return the id of this Nexo output."""
         return str(self._nexoOutput.id)
 
     @property

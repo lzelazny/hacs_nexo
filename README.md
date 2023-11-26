@@ -8,6 +8,9 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
 ### Working Items
 
  - Lights (on/off)
+ - Switches (on/off)
+ - Binary sensors (on/off)
+ - Analog sensors
 
 ## Deployment
 

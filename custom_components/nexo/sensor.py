@@ -1,17 +1,18 @@
 """Support for Nexo analog sensor."""
 from __future__ import annotations
 import logging
-from typing import Any, Final
+from typing import Final
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.sensor import (
     SensorEntity
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .nexoEntities import NexoAnalogSensor
+from nexoEntities.nexoAnalogSensor import NexoAnalogSensor
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -52,9 +53,8 @@ class HANexoAnalogSensor(SensorEntity):
         return 0
 
     @property
-    def device_class(self) -> str:
+    def device_class(self):
         return None
-
 
     @callback
     def async_update_state(self) -> None:

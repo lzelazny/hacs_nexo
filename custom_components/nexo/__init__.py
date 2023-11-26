@@ -1,7 +1,7 @@
-"""Nexwell Nexo web socket connecity integration."""
+"""Nexwell Nexo web socket connectivity integration."""
 from __future__ import annotations
 import logging
-from typing import Any, Final, final
+from typing import Final
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -15,7 +15,7 @@ PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.BINARY_SENSOR, Platform.SE
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up NexoBrige instance and initiate connectivity."""
+    """Set up NexoBridge instance and initiate connectivity."""
     try:
         ip = dict(entry.data)[CONF_HOST]
         nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip)
@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True
     except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Error connecting to %s", ip)
+        _LOGGER.exception("Connection Error")
 
     return False
 

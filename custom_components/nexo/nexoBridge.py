@@ -1,13 +1,19 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Final
-import threading
+from typing import Final
 import asyncio
 import websocket
 import json
-import time
 import logging
-import pkg_resources;
-import rel;
+import rel
+
+from nexoEntities.nexoLight import NexoLight
+from nexoEntities.nexoBinarySensor import NexoBinarySensor
+from nexoEntities.nexoAnalogSensor import NexoAnalogSensor
+from nexoEntities.nexoOutput import NexoOutput
+from nexoEntities.nexoTemperature import NexoTemperature
+from nexoEntities.nexoBlindGroup import NexoBlindGroup
+from nexoEntities.nexoGroupDimmer import NexoGroupDimmer
+from nexoEntities.nexoGate import NexoGate
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
@@ -15,21 +21,7 @@ NEXO_RESOURCE_TYPE_SENSOR = "sensor"
 NEXO_RESOURCE_TYPE_ANALOG_SENSOR = "analogsensor"
 NEXO_RESOURCE_TYPE_LIGHT = "light"
 NEXO_INIT_TIMEOUT = 10
-NEXO_RECONET_TIMEOUT = 5
-
-from .nexoEntities import (
-    NexoBlind,
-    NexoBlindGroup,
-    NexoGate,
-    NexoGroupDimmer,
-    NexoLight,
-    NexoOutput,
-    NexoPartition,
-    NexoResource,
-    NexoBinarySensor,
-    NexoAnalogSensor,
-    NexoTemperature,
-)
+NEXO_RECONNECT_TIMEOUT = 5
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -43,10 +35,10 @@ class NexoBridge:
         self.initialized = False
         self._loop = asyncio.get_running_loop()
 
-    def on_open(self, ws):
+    def on_open(self, web_socket):
         _LOGGER.info("Nexo integration started")
 
-    async def wait_for_initial_resouces_load(self, timeout):
+    async def wait_for_initial_resources_load(self, timeout):
         t = timeout
         while self.initialized is False and t > 0:
             await asyncio.sleep(1)
@@ -54,9 +46,9 @@ class NexoBridge:
 
     async def connect(self):
         _LOGGER.info("Connecting... %s:%s", self.local_ip, 8766)
-        _LOGGER.info("Reconect Timeout %s", NEXO_RECONET_TIMEOUT)
+        _LOGGER.info("Reconnect Timeout %s", NEXO_RECONNECT_TIMEOUT)
         _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
-        #websocket.enableTrace(traceable=True)
+        # websocket.enableTrace(traceable=True)
         self.ws = websocket.WebSocketApp(
             f"ws://{self.local_ip}:8766/",
             on_open=self.on_open,
@@ -64,12 +56,12 @@ class NexoBridge:
             on_error=self.on_error,
             on_close=self.on_close,
         )
-        self.ws.run_forever(dispatcher=rel, reconnect=NEXO_RECONET_TIMEOUT)
+        self.ws.run_forever(dispatcher=rel, reconnect=NEXO_RECONNECT_TIMEOUT)
         executor = ThreadPoolExecutor(max_workers=1)
         executor.submit(rel.dispatch)
-        await self.wait_for_initial_resouces_load(NEXO_INIT_TIMEOUT)
+        await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
 
-    def on_message(self, webSocet, message):
+    def on_message(self, web_socket, message):
         _LOGGER.debug("Message: %s", message)
         json_message = json.loads(message)
 
@@ -91,7 +83,6 @@ class NexoBridge:
             self.add_resource(self.raw_data_model["resources"][resource_id])
         self.initialized = True
 
-
     def on_message_data_update(self, json_message):
         for res in json_message["resources"]:
             resource = self.get_resource_by_id(json_message["resources"][res]["id"])
@@ -112,15 +103,15 @@ class NexoBridge:
             )
         )
 
-    def on_error(self, webSocet, error):
+    def on_error(self, web_socket, error):
         _LOGGER.error(error)
 
-    def on_close(self, webSocet, close_status_code, close_msg):
+    def on_close(self, web_socket, close_status_code, close_msg):
         _LOGGER.info("Connection closed")
 
     def add_resource(self, nexo_resource):
-        type = nexo_resource["type"]
-        match type:
+        nexo_resource_type = nexo_resource["type"]
+        match nexo_resource_type:
             case "light":
                 obj = NexoLight(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
@@ -166,7 +157,7 @@ class NexoBridge:
                 self.resources[obj.id] = obj
                 return obj
 
-            #case "partition":
+            # case "partition":
             #    obj = NexoPartition(self.ws, **nexo_resource)
             #    self.resources[obj.id] = obj
             #    return obj

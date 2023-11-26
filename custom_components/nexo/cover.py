@@ -1,7 +1,7 @@
 """Support for Nexo blinds."""
 from __future__ import annotations
 import logging
-from typing import Any, Final
+from typing import Final
 
 
 from homeassistant.config_entries import ConfigEntry
@@ -21,16 +21,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up"""
     nexo = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(HANexoBlind(l) for l in nexo.get_resources_by_type(NexoBlind))
+    async_add_entities(HANexoBlind(blind) for blind in nexo.get_resources_by_type(NexoBlind))
 
 
 class HANexoBlind(CoverEntity):
-    """Home Assiant Nexo Blind"""
+    """Home Assistant Nexo Blind"""
 
-    def __init__(self, nexoBlind) -> None:
+    def __init__(self, nexo_blind) -> None:
         super().__init__()
-        self._nexoBlind = nexoBlind
-        self._name = nexoBlind.name
+        self._nexoBlind = nexo_blind
+        self._name = nexo_blind.name
 
     @property
     def device_class(self) -> str:

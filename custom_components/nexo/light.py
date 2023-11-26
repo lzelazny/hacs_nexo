@@ -19,21 +19,21 @@ async def async_setup_entry(
 ) -> None:
     """Set up"""
     nexo = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(HANexoLight(l) for l in nexo.get_resources_by_type(NexoLight))
+    async_add_entities(HANexoLight(light) for light in nexo.get_resources_by_type(NexoLight))
 
 
 class HANexoLight(LightEntity):
     """Home Assistant Nexo light"""
 
-    def __init__(self, nexolight) -> None:
+    def __init__(self, nexo_light) -> None:
         super().__init__()
-        self._nexolight = nexolight
-        self._name = nexolight.name
+        self._nexolight = nexo_light
+        self._name = nexo_light.name
         self._attr_is_on = self._nexolight.is_on()
 
     @property
     def unique_id(self) -> str:
-        """Return the Id of this Nexo light."""
+        """Return the id of this Nexo light."""
         return str(self._nexolight.id)
 
     @property

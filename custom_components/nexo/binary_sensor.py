@@ -1,21 +1,18 @@
 """Support for Nexo binary sensor."""
 from __future__ import annotations
 import logging
-from typing import Any, Final
+from typing import Final
 
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
-    BinarySensorEntity,
-    BinarySensorEntityDescription,
+    BinarySensorEntity
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
-
-from .nexoEntities import NexoBinarySensor
 from .const import DOMAIN
+from nexoEntities.nexoBinarySensor import NexoBinarySensor
 
 _LOGGER: Final = logging.getLogger(__name__)
 
