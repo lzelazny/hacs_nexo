@@ -1,18 +1,15 @@
-"""Support for Nexo binary sensor."""
+"""Support for Nexo analog sensor."""
 from __future__ import annotations
 import logging
 from typing import Final
-
-
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity
+from homeassistant.components.sensor import (
+    SensorEntity
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from .nexo_analog_sensor import NexoAnalogSensor
 from .const import DOMAIN
-from .nexo_binary_sensor import NexoBinarySensor
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -24,19 +21,18 @@ async def async_setup_entry(
     nexo = hass.data[DOMAIN][entry.entry_id]
     sensors = []
 
-    for sensor in nexo.get_resources_by_type(NexoBinarySensor):
-        sensors.insert(0, HANexoBinarySensor(sensor))
+    for sensor in nexo.get_resources_by_type(NexoAnalogSensor):
+        sensors.insert(0, HANexoAnalogSensor(sensor))
 
     async_add_entities(sensors)
 
 
-class HANexoBinarySensor(BinarySensorEntity):
+class HANexoAnalogSensor(SensorEntity):
     """Home Assistant Nexo output"""
 
     def __init__(self, nexo_sensor) -> None:
         super().__init__()
         self._nexo_sensor = nexo_sensor
-        self._attr_is_on = self._nexo_sensor.is_on()
 
     @property
     def unique_id(self) -> str:
@@ -49,12 +45,16 @@ class HANexoBinarySensor(BinarySensorEntity):
         return str(self._nexo_sensor.name)
 
     @property
-    def is_on(self) -> bool:
-        return self._nexo_sensor.is_on()
+    def native_value(self) -> int:
+        return self._nexo_sensor.get_value()
 
     @property
-    def device_class(self) -> str:
-        return BinarySensorDeviceClass.MOTION
+    def suggested_display_precision(self) -> int:
+        return 0
+
+    @property
+    def device_class(self):
+        return None
 
     @callback
     def async_update_state(self) -> None:

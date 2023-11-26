@@ -1,31 +1,28 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Final
-import threading
+from typing import Final
 import asyncio
 import websocket
 import json
-import time
 import logging
+import rel
+
+from .nexo_light import NexoLight
+from .nexo_binary_sensor import NexoBinarySensor
+from .nexo_analog_sensor import NexoAnalogSensor
+from .nexo_output import NexoOutput
+from .nexo_temperature import NexoTemperature
+from .nexo_blind_group import NexoBlindGroup
+from .nexo_group_dimmer import NexoGroupDimmer
+from .nexo_gate import NexoGate
+from .nexo_resource import NexoResource
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
 NEXO_RESOURCE_TYPE_SENSOR = "sensor"
 NEXO_RESOURCE_TYPE_ANALOG_SENSOR = "analogsensor"
 NEXO_RESOURCE_TYPE_LIGHT = "light"
-
-from .nexoEntities import (
-    NexoAnalogSensor,
-    NexoBlind,
-    NexoBlindGroup,
-    NexoGate,
-    NexoGroupDimmer,
-    NexoLight,
-    NexoOutput,
-    NexoPartition,
-    NexoResource,
-    NexoSensor,
-    NexoTemperature,
-)
+NEXO_INIT_TIMEOUT = 10
+NEXO_RECONNECT_TIMEOUT = 5
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -39,10 +36,19 @@ class NexoBridge:
         self.initialized = False
         self._loop = asyncio.get_running_loop()
 
-    def on_open(self, ws):
-        print("Opened connection")
+    def on_open(self, web_socket):
+        _LOGGER.info("Nexo integration started")
+
+    async def wait_for_initial_resources_load(self, timeout):
+        t = timeout
+        while self.initialized is False and t > 0:
+            await asyncio.sleep(1)
+            t = t - 1
 
     async def connect(self):
+        _LOGGER.info("Connecting... %s:%s", self.local_ip, 8766)
+        _LOGGER.info("Reconnect Timeout %s", NEXO_RECONNECT_TIMEOUT)
+        _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
         # websocket.enableTrace(traceable=True)
         self.ws = websocket.WebSocketApp(
             f"ws://{self.local_ip}:8766/",
@@ -51,20 +57,25 @@ class NexoBridge:
             on_error=self.on_error,
             on_close=self.on_close,
         )
-
-        # wst = threading.Thread(target=self.ws.run_forever)
-        # wst.daemon = True
-        # wst.start()
-
-        # asyncio.run(self.ws.run_forever(reconnect=10))
-
+        self.ws.run_forever(dispatcher=rel, reconnect=NEXO_RECONNECT_TIMEOUT)
         executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(self.ws.run_forever)
-        timeout = 5
+        executor.submit(rel.dispatch)
+        await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
 
-        while self.initialized is False and timeout > 0:
-            await asyncio.sleep(1)
-            timeout = timeout - 1
+    def on_message(self, web_socket, message):
+        _LOGGER.debug("Message: %s", message)
+        json_message = json.loads(message)
+
+        if json_message["op"] == "initial_data":
+            self.on_message_initial_data(json_message)
+
+        if json_message["op"] == "data_update":
+                self.on_message_data_update(json_message)
+
+    def on_message_initial_data(self, json_message):
+        if len(self.raw_data_model.keys()) == 0:
+            self.raw_data_model = json_message
+            self.update_resources()
 
     def update_resources(self):
         self.initialized = False
@@ -72,21 +83,6 @@ class NexoBridge:
         for resource_id in dict(self.raw_data_model["resources"]):
             self.add_resource(self.raw_data_model["resources"][resource_id])
         self.initialized = True
-
-    def on_message(self, webSocet, message):
-        json_message = json.loads(message)
-
-        _LOGGER.debug(json_message)
-
-        if json_message["op"] == "initial_data":
-            self.on_message_initial_data(json_message)
-        if json_message["op"] == "data_update":
-            self.on_message_data_update(json_message)
-
-    def on_message_initial_data(self, json_message):
-        if len(self.raw_data_model.keys()) == 0:
-            self.raw_data_model = json_message
-            self.update_resources()
 
     def on_message_data_update(self, json_message):
         for res in json_message["resources"]:
@@ -108,22 +104,27 @@ class NexoBridge:
             )
         )
 
-    def on_error(self, webSocet, error):
-        print(error)
+    def on_error(self, web_socket, error):
+        _LOGGER.error(error)
 
-    def on_close(self, webSocet, close_status_code, close_msg):
-        print("### closed ###")
+    def on_close(self, web_socket, close_status_code, close_msg):
+        _LOGGER.info("Connection closed")
 
     def add_resource(self, nexo_resource):
-        type = nexo_resource["type"]
-        match type:
+        nexo_resource_type = nexo_resource["type"]
+        match nexo_resource_type:
             case "light":
                 obj = NexoLight(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 
             case "sensor":
-                obj = NexoSensor(self.ws, **nexo_resource)
+                obj = NexoBinarySensor(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+                return obj
+
+            case "analogsensor":
+                obj = NexoAnalogSensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 
@@ -152,20 +153,15 @@ class NexoBridge:
                 self.resources[obj.id] = obj
                 return obj
 
-            case "analogsensor":
-                obj = NexoAnalogSensor(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
-
             case "gate":
                 obj = NexoGate(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
 
-            case "partition":
-                obj = NexoPartition(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            # case "partition":
+            #    obj = NexoPartition(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
             case _:
                 print(f"not supported {type}")
