@@ -134,6 +134,22 @@ class NexoBlind(NexoResource):
         self.time_pulse = time_pulse
         self.time_up = time_up
 
+    def is_opened(self) -> bool:
+        match self.state["blind_op"]:
+            case 0:
+                return False
+            case 1:
+                return True
+            case _:
+                return None
+
+    def is_inMove(self) -> bool:
+        match self.state["blind_op"]:
+            case 2:
+                return True
+            case _:
+                return None
+
 class NexoBlindGroup(NexoResource):
     def __init__(self, web_socet, ios, *args, **kwargs):
         super().__init__(web_socet, *args, **kwargs)

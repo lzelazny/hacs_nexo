@@ -77,7 +77,6 @@ class NexoBridge:
             self.on_message_initial_data(json_message)
 
         if json_message["op"] == "data_update":
-            if (self.initialized):
                 self.on_message_data_update(json_message)
 
     def on_message_initial_data(self, json_message):
@@ -167,10 +166,10 @@ class NexoBridge:
                 self.resources[obj.id] = obj
                 return obj
 
-            case "partition":
-                obj = NexoPartition(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+            #case "partition":
+            #    obj = NexoPartition(self.ws, **nexo_resource)
+            #    self.resources[obj.id] = obj
+            #    return obj
 
             case _:
                 print(f"not supported {type}")
