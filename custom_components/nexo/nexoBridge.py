@@ -14,6 +14,7 @@ from .nexo_temperature import NexoTemperature
 from .nexo_blind_group import NexoBlindGroup
 from .nexo_group_dimmer import NexoGroupDimmer
 from .nexo_gate import NexoGate
+from .nexo_resource import NexoResource
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"

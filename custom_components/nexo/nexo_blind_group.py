@@ -1,4 +1,4 @@
-from nexo_resource import NexoResource
+from .nexo_resource import NexoResource
 
 class NexoBlindGroup(NexoResource):
     def __init__(self, web_socket, ios, *args, **kwargs):

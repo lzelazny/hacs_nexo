@@ -1,4 +1,4 @@
-from nexo_resource import NexoResource
+from .nexo_resource import NexoResource
 
 
 class NexoBlind(NexoResource):
@@ -23,4 +23,3 @@ class NexoBlind(NexoResource):
                 return True
             case _:
                 return None
-            
