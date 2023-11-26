@@ -6,14 +6,14 @@ import json
 import logging
 import rel
 
-from nexoEntities.nexoLight import NexoLight
-from nexoEntities.nexoBinarySensor import NexoBinarySensor
-from nexoEntities.nexoAnalogSensor import NexoAnalogSensor
-from nexoEntities.nexoOutput import NexoOutput
-from nexoEntities.nexoTemperature import NexoTemperature
-from nexoEntities.nexoBlindGroup import NexoBlindGroup
-from nexoEntities.nexoGroupDimmer import NexoGroupDimmer
-from nexoEntities.nexoGate import NexoGate
+from .nexo_light import NexoLight
+from .nexo_binary_sensor import NexoBinarySensor
+from .nexo_analog_sensor import NexoAnalogSensor
+from .nexo_output import NexoOutput
+from .nexo_temperature import NexoTemperature
+from .nexo_blind_group import NexoBlindGroup
+from .nexo_group_dimmer import NexoGroupDimmer
+from .nexo_gate import NexoGate
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"

@@ -1,6 +1,8 @@
 from typing import Callable, Final
 import asyncio
 import logging
+
+
 class NexoResource:
     """Common Nexo features"""
     _LOGGER: Final = logging.getLogger(__name__)

@@ -10,7 +10,7 @@ from homeassistant.components.cover import CoverEntity, CoverDeviceClass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .nexoBridge import NexoBlind
+from .nexo_blind import NexoBlind
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)

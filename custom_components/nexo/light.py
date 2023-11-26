@@ -8,7 +8,7 @@ from homeassistant.components.light import LightEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .nexoBridge import NexoLight
+from .nexo_light import NexoLight
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)

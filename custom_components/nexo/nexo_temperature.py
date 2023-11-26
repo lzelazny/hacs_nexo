@@ -1,4 +1,4 @@
-from nexoResource import NexoResource
+from nexo_resource import NexoResource
 
 
 class NexoTemperature(NexoResource):

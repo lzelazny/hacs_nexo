@@ -8,7 +8,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from nexoEntities.nexoAnalogSensor import NexoAnalogSensor
+from .nexo_analog_sensor import NexoAnalogSensor
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)

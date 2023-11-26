@@ -1,7 +1,6 @@
-from nexoResource import NexoResource
+from nexo_resource import NexoResource
 
-
-class NexoGroupDimmer(NexoResource):
+class NexoBlindGroup(NexoResource):
     def __init__(self, web_socket, ios, *args, **kwargs):
         super().__init__(web_socket, *args, **kwargs)
         self.ios = ios

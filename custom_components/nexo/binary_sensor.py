@@ -12,7 +12,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
-from nexoEntities.nexoBinarySensor import NexoBinarySensor
+from .nexo_binary_sensor import NexoBinarySensor
 
 _LOGGER: Final = logging.getLogger(__name__)
 

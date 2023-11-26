@@ -8,8 +8,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-
-from nexoEntities.nexoOutput import NexoOutput
+from .nexo_output import NexoOutput
 from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)
