@@ -11,6 +11,8 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
  - Switches (on/off)
  - Binary sensors (on/off)
  - Analog sensors
+ - Analog sensors - temperature
+ - Blinds (open/close/stop/set position)
 
 ## Deployment
 
