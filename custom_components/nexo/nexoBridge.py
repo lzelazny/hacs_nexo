@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import Final
 import asyncio
+from sqlalchemy import null
 import websocket
 import json
 import logging
@@ -14,6 +15,7 @@ from .nexo_temperature import NexoTemperature
 from .nexo_blind_group import NexoBlindGroup
 from .nexo_group_dimmer import NexoGroupDimmer
 from .nexo_gate import NexoGate
+from .nexo_blind import NexoBlind
 from .nexo_resource import NexoResource
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
@@ -35,6 +37,13 @@ class NexoBridge:
         self.raw_data_model = dict()
         self.initialized = False
         self._loop = asyncio.get_running_loop()
+
+    def watchdog(self):
+        if self.ws.sock.getstatus() != 101:
+            print("Connection reconect")
+            _ = self.connect()
+        asyncio.get_event_loop().call_later(2,self.watchdog)
+
 
     def on_open(self, web_socket):
         _LOGGER.info("Nexo integration started")
@@ -61,6 +70,7 @@ class NexoBridge:
         executor = ThreadPoolExecutor(max_workers=1)
         executor.submit(rel.dispatch)
         await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
+        self.watchdog()
 
     def on_message(self, web_socket, message):
         _LOGGER.debug("Message: %s", message)
@@ -73,7 +83,9 @@ class NexoBridge:
                 self.on_message_data_update(json_message)
 
     def on_message_initial_data(self, json_message):
-        if len(self.raw_data_model.keys()) == 0:
+        print(">>>>>>>>>>>>>Initial")
+        print(json_message)
+        if len(self.raw_data_model.keys()) == 0 and len(json_message.keys()) > 0:
             self.raw_data_model = json_message
             self.update_resources()
 
@@ -83,14 +95,17 @@ class NexoBridge:
         for resource_id in dict(self.raw_data_model["resources"]):
             self.add_resource(self.raw_data_model["resources"][resource_id])
         self.initialized = True
+        print("AFTER INIT")
+        print(self.resources)
 
     def on_message_data_update(self, json_message):
-        for res in json_message["resources"]:
-            resource = self.get_resource_by_id(json_message["resources"][res]["id"])
-            if resource is not None:
-                resource.state = json_message["resources"][res]["state"]
-                resource.timestamp = json_message["resources"][res]["timestamp"]
-                resource.publish_update(self._loop)
+        if "resources" in json_message:
+            for res in json_message["resources"]:
+                resource = self.get_resource_by_id(json_message["resources"][res]["id"])
+                if resource is not None:
+                    resource.state = json_message["resources"][res]["state"]
+                    resource.timestamp = json_message["resources"][res]["timestamp"]
+                    resource.publish_update(self._loop)
 
     def get_resource_by_id(self, resource_id):
         if int(resource_id) in self.resources.keys():
@@ -108,7 +123,7 @@ class NexoBridge:
         _LOGGER.error(error)
 
     def on_close(self, web_socket, close_status_code, close_msg):
-        _LOGGER.info("Connection closed")
+        _LOGGER.error("Connection closed")
 
     def add_resource(self, nexo_resource):
         nexo_resource_type = nexo_resource["type"]
@@ -134,14 +149,15 @@ class NexoBridge:
                 return obj
 
             case "temperature":
-                obj = NexoTemperature(self.ws, **nexo_resource)
+                if not ('thermometer_id' in nexo_resource):
+                    obj = NexoTemperature(self.ws, **nexo_resource)
+                    self.resources[obj.id] = obj
+                    return obj
+
+            case "blind":
+                obj = NexoBlind(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
-
-            #   case "blind":
-            #      obj = NexoBlind(self.ws, **nexo_resource)
-            #     self.resources[obj.id] = obj
-            #    return obj
 
             case "group_blind":
                 obj = NexoBlindGroup(self.ws, **nexo_resource)

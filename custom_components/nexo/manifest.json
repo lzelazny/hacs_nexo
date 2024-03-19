@@ -7,8 +7,9 @@
   "documentation": "https://github.com/lzelazny/hacs_nexo/blob/main/README.md",
   "homekit": {},
   "iot_class": "local_push",
-  "requirements": ["websocket-client==1.6.4", "rel==0.4.9"],
+  "requirements": ["websocket-client==1.7.0", "rel==0.4.9"],
+  "loggers": ["nexo"],
   "ssdp": [],
   "zeroconf": [],
-  "version": "1.1.0"
+  "version": "1.2.0"
 }
