@@ -32,7 +32,7 @@ async def async_setup_entry(
     for sensor in nexo.get_resources_by_type(NexoAnalogSensor):
         sensors.insert(0, HANexoAnalogSensor(sensor))
 
-    for temp in nexo.get_resources_by_type(NexoTemperature):
+    for temp in nexo.get_resources_by_exact_type(NexoTemperature):
         temperature_sensors.insert(0, HANexoTemperatureSensor(temp))
 
     async_add_entities(sensors)
