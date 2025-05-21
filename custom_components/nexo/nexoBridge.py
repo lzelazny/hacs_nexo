@@ -12,6 +12,7 @@ from .nexo_binary_sensor import NexoBinarySensor
 from .nexo_analog_sensor import NexoAnalogSensor
 from .nexo_output import NexoOutput
 from .nexo_temperature import NexoTemperature
+from .nexo_thermostat import NexoThermostat
 from .nexo_blind_group import NexoBlindGroup
 from .nexo_group_dimmer import NexoGroupDimmer
 from .nexo_gate import NexoGate
@@ -112,6 +113,11 @@ class NexoBridge:
             return self.resources[int(resource_id)]
         return None
 
+    def get_resources_by_exact_type(self, resource_type):
+        return list(
+            filter(lambda x: type(x) is resource_type, list(self.resources.values()))
+        )
+
     def get_resources_by_type(self, resource_type):
         return list(
             filter(
@@ -149,10 +155,15 @@ class NexoBridge:
                 return obj
 
             case "temperature":
-                if not ('thermometer_id' in nexo_resource):
-                    obj = NexoTemperature(self.ws, **nexo_resource)
-                    self.resources[obj.id] = obj
-                    return obj
+                match nexo_resource["mode"]:
+                    case 1:
+                        obj = NexoTemperature(self.ws, **nexo_resource)
+                    case 2:
+                        obj = NexoThermostat(self.ws, **nexo_resource)
+                    case _:
+                        return None
+                self.resources[obj.id] = obj
+                return obj
 
             case "blind":
                 obj = NexoBlind(self.ws, **nexo_resource)
