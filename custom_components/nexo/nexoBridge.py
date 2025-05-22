@@ -140,6 +140,8 @@ class NexoBridge:
                 return obj
 
             case "sensor":
+                if "state" not in nexo_resource:
+                    return None
                 obj = NexoBinarySensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
                 return obj
