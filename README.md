@@ -13,6 +13,9 @@ Unofficial Simple integration exposing devices managed by Nexwell/Nexo system us
  - Analog sensors
  - Analog sensors - temperature
  - Blinds (open/close/stop/set position)
+ - Thermostats
+ - Gate
+ - Alarm
 
 ## Deployment
 
