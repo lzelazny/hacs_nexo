@@ -32,6 +32,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 class NexoBridge:
     def __init__(self, local_ip) -> None:
+        self.__executor = ThreadPoolExecutor(max_workers=1)
         self.ws = None
         self.resources = dict()
         self.local_ip = local_ip
@@ -39,12 +40,15 @@ class NexoBridge:
         self.initialized = False
         self._loop = asyncio.get_running_loop()
 
-    def watchdog(self):
-        if self.ws.sock.getstatus() != 101:
+    async def async_watchdog(self):
+        if self.ws.sock is None or self.ws.sock.getstatus() != 101:
             print("Connection reconect")
-            _ = self.connect()
-        asyncio.get_event_loop().call_later(2,self.watchdog)
-
+            await self.connect()
+        else:
+            asyncio.get_event_loop().call_later(
+                NEXO_RECONNECT_TIMEOUT,
+                lambda: asyncio.create_task(self.async_watchdog()),
+            )
 
     def on_open(self, web_socket):
         _LOGGER.info("Nexo integration started")
@@ -60,6 +64,9 @@ class NexoBridge:
         _LOGGER.info("Reconnect Timeout %s", NEXO_RECONNECT_TIMEOUT)
         _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
         # websocket.enableTrace(traceable=True)
+        if self.ws is not None:
+            self.ws.close()
+
         self.ws = websocket.WebSocketApp(
             f"ws://{self.local_ip}:8766/",
             on_open=self.on_open,
@@ -67,11 +74,18 @@ class NexoBridge:
             on_error=self.on_error,
             on_close=self.on_close,
         )
-        self.ws.run_forever(dispatcher=rel, reconnect=NEXO_RECONNECT_TIMEOUT)
-        executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(rel.dispatch)
+        self.ws.run_forever(
+            dispatcher=rel,
+            reconnect=NEXO_RECONNECT_TIMEOUT,
+            ping_interval=NEXO_RECONNECT_TIMEOUT,
+            ping_payload='{"type":"ping"}',
+        )
+
+        if not rel.is_running():
+            self.__executor.submit(rel.dispatch)
+
         await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
-        self.watchdog()
+        await self.async_watchdog()
 
     def on_message(self, web_socket, message):
         _LOGGER.debug("Message: %s", message)
@@ -81,7 +95,7 @@ class NexoBridge:
             self.on_message_initial_data(json_message)
 
         if json_message["op"] == "data_update":
-                self.on_message_data_update(json_message)
+            self.on_message_data_update(json_message)
 
     def on_message_initial_data(self, json_message):
         print(">>>>>>>>>>>>>Initial")
@@ -89,6 +103,8 @@ class NexoBridge:
         if len(self.raw_data_model.keys()) == 0 and len(json_message.keys()) > 0:
             self.raw_data_model = json_message
             self.update_resources()
+        else:
+            self.refresh_resources()
 
     def update_resources(self):
         self.initialized = False
@@ -98,6 +114,10 @@ class NexoBridge:
         self.initialized = True
         print("AFTER INIT")
         print(self.resources)
+
+    def refresh_resources(self):
+        for resource in self.resources.values():
+            resource.web_socket = self.ws
 
     def on_message_data_update(self, json_message):
         if "resources" in json_message:
