@@ -1,3 +1,5 @@
+[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/lzelazny/hacs_nexo/blob/main/README.md)
+[![pl](https://img.shields.io/badge/lang-es-yellow.svg)](https://github.com/lzelazny/hacs_nexo/blob/main/README.pl.md)
 
 # hacs_nexo – Unofficial Home Assistant Integration for Nexwell/Nexo System
 
