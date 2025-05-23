@@ -14,6 +14,7 @@ from .nexoBridge import NexoBridge
 
 _LOGGER: Final = logging.getLogger(__name__)
 PLATFORMS: list[Platform | str] = [
+    Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.COVER,

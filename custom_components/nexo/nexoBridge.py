@@ -17,7 +17,7 @@ from .nexo_blind_group import NexoBlindGroup
 from .nexo_group_dimmer import NexoGroupDimmer
 from .nexo_gate import NexoGate
 from .nexo_blind import NexoBlind
-from .nexo_resource import NexoResource
+from .nexo_partition import NexoPartition
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
@@ -103,7 +103,7 @@ class NexoBridge:
         if "resources" in json_message:
             for res in json_message["resources"]:
                 resource = self.get_resource_by_id(json_message["resources"][res]["id"])
-                if resource is not None:
+                if resource is not None and "state" in json_message["resources"][res]:
                     resource.state = json_message["resources"][res]["state"]
                     resource.timestamp = json_message["resources"][res]["timestamp"]
                     resource.publish_update(self._loop)
@@ -187,10 +187,10 @@ class NexoBridge:
                 self.resources[obj.id] = obj
                 return obj
 
-            # case "partition":
-            #    obj = NexoPartition(self.ws, **nexo_resource)
-            #    self.resources[obj.id] = obj
-            #    return obj
+            case "partition":
+                obj = NexoPartition(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+                return obj
 
             case _:
                 print(f"not supported {type}")
