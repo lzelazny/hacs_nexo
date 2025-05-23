@@ -4,7 +4,7 @@ import logging
 from typing import Any, Final
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.light import LightEntity
+from homeassistant.components.light import ColorMode, LightEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -29,7 +29,8 @@ class HANexoLight(LightEntity):
         super().__init__()
         self._nexolight = nexo_light
         self._name = nexo_light.name
-        self._attr_is_on = self._nexolight.is_on()
+        self._attr_supported_color_modes = ColorMode.ONOFF
+        self._attr_color_mode = ColorMode.ONOFF
 
     @property
     def unique_id(self) -> str:
