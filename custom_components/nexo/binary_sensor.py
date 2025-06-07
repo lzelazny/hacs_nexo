@@ -1,18 +1,22 @@
-"""Support for Nexo binary sensor."""
+"""Nexo Binary Sensor Entity."""
+
 from __future__ import annotations
+
 import logging
 from typing import Final
 
-
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
-    BinarySensorEntity
+    BinarySensorEntity,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
 from .const import DOMAIN
+from .nexo import HANexo
 from .nexo_binary_sensor import NexoBinarySensor
+from .nexoBridge import NexoBridge
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -20,53 +24,28 @@ _LOGGER: Final = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up"""
-    nexo = hass.data[DOMAIN][entry.entry_id]
-    sensors = []
-
-    for sensor in nexo.get_resources_by_type(NexoBinarySensor):
-        sensors.insert(0, HANexoBinarySensor(sensor))
-
-    async_add_entities(sensors)
+    """Set up."""
+    nexo: NexoBridge = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities(
+        HANexoBinarySensor(sensor)
+        for sensor in nexo.get_resources_by_type(NexoBinarySensor)
+    )
 
 
-class HANexoBinarySensor(BinarySensorEntity):
-    """Home Assistant Nexo output"""
+class HANexoBinarySensor(HANexo, BinarySensorEntity):
+    """Home Assistant Nexo Binary Sensor."""
 
     def __init__(self, nexo_sensor) -> None:
-        super().__init__()
-        self._nexo_sensor = nexo_sensor
-        self._attr_is_on = self._nexo_sensor.is_on()
+        """Initialize the Nexo binary sensor."""
+        super().__init__(nexo_resource=nexo_sensor)
+        self._nexo_sensor: NexoBinarySensor = nexo_sensor
 
     @property
-    def unique_id(self) -> str:
-        """Return the id of this Nexo output."""
-        return str(self._nexo_sensor.id)
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this output."""
-        return str(self._nexo_sensor.name)
-
-    @property
-    def is_on(self) -> bool:
-        return self._nexo_sensor.is_on()
+    def is_on(self) -> bool | None:
+        """Return the state of the binary sensor."""
+        return self._nexo_sensor.is_on
 
     @property
     def device_class(self) -> str:
+        """Return the device class of this binary sensor."""
         return BinarySensorDeviceClass.MOTION
-
-    @callback
-    def async_update_state(self) -> None:
-        """Notify of internal state update"""
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        """Run when this Entity has been added to HA."""
-        # Nexo Light should also register callbacks to HA when their state changes
-        self._nexo_sensor.register_callback(self.async_update_state)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._nexo_sensor.remove_callback(self.async_update_state)

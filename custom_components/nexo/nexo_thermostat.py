@@ -1,54 +1,56 @@
+"""Nexo thermostat."""
+
+from typing import Final
+
 from .nexo_temperature import NexoTemperature
-from homeassistant.components.climate.const import (
-    HVACAction,
-    HVACMode,
-)
 
 
 class NexoThermostat(NexoTemperature):
-    """Nexo thermostat sensor"""
+    """Nexo thermostat resource."""
 
-    def __init__(self, web_socket, min, max, *args, **kwargs):
-        """Initialize the Nexo thermostat sensor."""
+    _NONE_VALUE: Final = 32767
+
+    def __init__(self, web_socket, min, max, *args, **kwargs) -> None:
+        """Initialize the Nexo thermostat resource."""
         super().__init__(web_socket, *args, **kwargs)
-        self.min = min
-        self.max = max
+        self._min = min
+        self._max = max
 
-    def get_havac_mode(self) -> HVACMode:
-        """Return the current HVAC mode."""
-        if bool(self._get_is_on()):
-            return HVACMode.HEAT_COOL
-        return HVACMode.OFF
+    @property
+    def min(self) -> float:
+        """Return the minimum thermostat temperature."""
+        return self._min
 
-    def get_hvac_action(self) -> HVACAction:
-        """Return the current HVAC action."""
-        if not bool(self._get_is_on()):
-            return HVACAction.OFF
-        if bool(self.state["is_active"]):
-            return HVACAction.COOLING
-        return HVACAction.HEATING
+    @property
+    def max(self) -> float:
+        """Return the maximum thermostat temperature."""
+        return self._max
 
-    def turn_on(self):
-        """Turn on the thermostat."""
-        self.web_socket.send(self._get_message(1))
-
-    def turn_off(self):
-        """Turn off the thermostat."""
-        self.web_socket.send(self._get_message(0))
-
-    def toggle(self):
-        """Toggle the thermostat."""
-        self.web_socket.send(self._get_message(1 if self._get_is_on() == 0 else 0))
-
-    def set_value(self, value):
-        """Set the target temperature."""
-        value = int(value * 10)
-        self.web_socket.send(self._get_message(self._get_is_on(), value))
-
-    def _get_is_on(self):
-        """Return the current state of the thermostat."""
+    @property
+    def is_on(self) -> bool:
+        """Return whether the thermostat is on."""
         return self.state["is_on"]
 
-    def _get_message(self, operation, value=32767):
-        """Return the message to send to the thermostat."""
-        return f'{{"type": "resource", "id": {self.id}, "cmd":{{"operation":{operation},"value":{value}}} }}'
+    @property
+    def is_active(self) -> bool:
+        """Return whether the thermostat is active."""
+        return self.state["is_active"]
+
+    async def async_turn_on(self) -> None:
+        """Turn on the thermostat."""
+        await self._async_send_cmd_operation(1, self._NONE_VALUE)
+
+    async def async_turn_off(self) -> None:
+        """Turn off the thermostat."""
+        await self._async_send_cmd_operation(0, self._NONE_VALUE)
+
+    async def async_toggle(self) -> None:
+        """Toggle the thermostat."""
+        await self._async_send_cmd_operation(
+            1 if not self.is_on else 0, self._NONE_VALUE
+        )
+
+    async def async_set_value(self, value) -> None:
+        """Set the target temperature."""
+        value = int(value * 10)
+        await self._async_send_cmd_operation(int(self.is_on), value)

@@ -1,98 +1,88 @@
-from .nexo_resource import NexoResource
+"""Nexo Blind."""
+
 from enum import Enum
 
+from .nexo_resource import NexoResource
+
+
 class BlindOperation(Enum):
+    """Enum for blind operations."""
+
     STOP = 0
     CLOSE = 1
     OPEN = 2
     TOGGLE = 3
     SET_LEVEL = 64
 
+
 class NexoBlind(NexoResource):
-    def __init__(self, web_socket, time_down, time_pulse, time_up, *args, **kwargs):
-        super().__init__(web_socket, *args, **kwargs)
-        self.time_down = time_down
-        self.time_pulse = time_pulse
-        self.time_up = time_up
+    """Nexo blind resource."""
 
-    def close(self):
-        self.web_socket.send(self._get_close_message())
+    async def async_close(self) -> None:
+        """Close the blind."""
+        await self._async_send_cmd(self._get_cmd(BlindOperation.CLOSE.value))
 
-    def open(self):
-        self.web_socket.send(self._get_open_message())
+    async def async_open(self) -> None:
+        """Open the blind."""
+        await self._async_send_cmd(self._get_cmd(BlindOperation.OPEN.value))
 
-    def stop(self):
-        self.web_socket.send(self._open_close_message(0))
+    async def async_stop(self) -> None:
+        """Stop the blind."""
+        await self._async_send_cmd(self._get_cmd(BlindOperation.STOP.value))
 
-    def setLevel(self, level):
-        self.web_socket.send(self._set_position(level))
+    async def async_setLevel(self, level) -> None:
+        """Set the blind level."""
+        await self._async_send_cmd(
+            self._get_cmd_position(BlindOperation.SET_LEVEL.value, level)
+        )
 
-    def _get_open_message(self):
-        return self._open_close_message(BlindOperation.OPEN.value)
+    def _get_cmd(self, operation) -> str:
+        return f'"blind_op":{operation}'
 
-    def _get_close_message(self):
-        return self._open_close_message(BlindOperation.CLOSE.value)
+    def _get_cmd_position(self, operation, level) -> str:
+        level = 100 - level
+        return f'"blind_op":{operation},"blind_level":{level},"blind_slope":255'
 
-    def _get_stop_message(self):
-        return self._open_close_message(BlindOperation.STOP.value)
+    @property
+    def _blind_level(self) -> int:
+        return self.state["blind_level"]
 
-    def _open_close_message(self, operation):
-        return f'{{"type": "resource", "id": {self.id}, "cmd":{{"blind_op":{operation}}}}}'
+    @property
+    def _blind_op(self) -> int:
+        return self.state["blind_op"]
 
-    def _set_position(self, level):
-        nextLevel = 100 - level
-        return f'{{"type": "resource", "id": {self.id}, "cmd":{{"blind_op":{BlindOperation.SET_LEVEL.value},"blind_level":{nextLevel},"blind_slope":255}}}}'
+    @property
+    def openPercentage(self) -> int:
+        """Return the open percentage of the blind."""
+        return 100 - self._blind_level
 
-    def openPercentage (self):
-        return 100 - self.state['blind_level']
+    @property
+    def is_opened(self) -> bool:
+        """Return True if the blind is fully opened."""
+        return self._blind_level == 0
 
-    def is_opened(self):
-        match self.state["blind_level"]:
-            case 0:
-                return True
-            case 100:
-                return False
-            case _:
-                return False
+    @property
+    def is_closed(self) -> bool:
+        """Return True if the blind is fully closed."""
+        return self._blind_level == 100
 
-    def is_closed(self):
-        match self.state["blind_level"]:
-            case 0:
-                return False
-            case 100:
-                return True
-            case _:
-                return False
+    @property
+    def is_closing(self) -> bool:
+        """Return True if the blind is closing."""
+        return self._blind_op == 1
 
-    def is_closing(self):
-        match self.state["blind_op"]:
-            case 0:
-                return False
-            case 1:
-                return True
-            case 2:
-                return False
-            case _:
-                return False
+    @property
+    def is_opening(self) -> bool:
+        """Return True if the blind is opening."""
+        return self._blind_op == 2
 
-    def is_opening(self):
-        match self.state["blind_op"]:
+    @property
+    def is_in_move(self) -> bool | None:
+        """Return True if the blind is moving."""
+        match self._blind_op:
             case 0:
                 return False
-            case 1:
-                return False
-            case 2:
-                return True
-            case _:
-                return False
-
-    def is_in_move(self):
-        match self.state["blind_op"]:
-            case 0:
-                return False
-            case 1:
-                return True
-            case 2:
+            case 1 | 2:
                 return True
             case _:
                 return None
