@@ -1,15 +1,12 @@
-from .nexo_resource import NexoResource
+"""Nexo temperature."""
+
+from .nexo_analog_sensor import NexoAnalogSensor
 
 
-class NexoTemperature(NexoResource):
-    def __init__(self, web_socket, *args, **kwargs):
-        super().__init__(web_socket, *args, **kwargs)
+class NexoTemperature(NexoAnalogSensor):
+    """Nexo temperature sensor."""
 
-    #def __init__(self, web_socket, max, min, mode, *args, **kwargs):
-    #    super().__init__(web_socket, *args, **kwargs)
-    #    self.max = max
-    #    self.min = min
-    #    self.mode = mode
-
-    def get_value(self) -> float:
-        return float(self.state["value"]) / 10
+    @property
+    def value(self) -> float:
+        """Return the current temperature value."""
+        return super().value / 10

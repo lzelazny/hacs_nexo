@@ -1,6 +1,4 @@
-"""Nexo partition resource definitions."""
-
-from homeassistant.components.alarm_control_panel import AlarmControlPanelState
+"""Nexo partition."""
 
 from .nexo_resource import NexoResource
 
@@ -8,26 +6,30 @@ from .nexo_resource import NexoResource
 class NexoPartition(NexoResource):
     """Nexo partition resource."""
 
-    def get_state(self) -> AlarmControlPanelState:
-        """Return the state of the partition."""
-        if bool(self.state["is_damaged"]):
-            return "Damaged"
-        if bool(self.state["is_suspended"]):
-            return AlarmControlPanelState.PENDING
-        if bool(self.state["is_alarming"]):
-            return AlarmControlPanelState.TRIGGERED
-        if bool(self.state["is_armed"]):
-            return AlarmControlPanelState.ARMED_AWAY
-        return AlarmControlPanelState.DISARMED
+    @property
+    def is_armed(self) -> bool:
+        """Return True if the partition is armed, False if disarmed."""
+        return bool(self.state["is_armed"])
 
-    def arm(self, password):
+    @property
+    def is_suspended(self) -> bool:
+        """Return True if the partition is suspended, False otherwise."""
+        return bool(self.state["is_suspended"])
+
+    @property
+    def is_damaged(self) -> bool:
+        """Return True if the partition is damaged, False otherwise."""
+        return bool(self.state["is_damaged"])
+
+    @property
+    def is_alarming(self) -> bool:
+        """Return True if the partition is alarming, False otherwise."""
+        return bool(self.state["is_alarming"])
+
+    async def async_arm(self, password) -> None:
         """Arm the partition."""
-        self.web_socket.send(self._get_message(1, password))
+        await self._async_send_cmd_operation_custom(1, password=f'"{password}"')
 
-    def disarm(self, password):
+    async def async_disarm(self, password) -> None:
         """Disarm the partition."""
-        self.web_socket.send(self._get_message(0, password))
-
-    def _get_message(self, operation, password):
-        """Return the message to send to the partition."""
-        return f'{{"type":"resource","id":{self.id},"cmd":{{"operation":{operation},"password":"{password}"}}}}'
+        await self._async_send_cmd_operation_custom(0, password=f'"{password}"')
