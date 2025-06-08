@@ -1,23 +1,25 @@
-from concurrent.futures import ThreadPoolExecutor
-from typing import Final
 import asyncio
-from sqlalchemy import null
-import websocket
+from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
-import rel
+from typing import Final
 
-from .nexo_light import NexoLight
-from .nexo_binary_sensor import NexoBinarySensor
+import rel
+from sqlalchemy import null
+import websocket
+
 from .nexo_analog_sensor import NexoAnalogSensor
+from .nexo_binary_sensor import NexoBinarySensor
+from .nexo_blind import NexoBlind
+from .nexo_blind_group import NexoBlindGroup
+from .nexo_gate import NexoGate
+from .nexo_group_dimmer import NexoGroupDimmer
+from .nexo_light import NexoLight
 from .nexo_output import NexoOutput
+from .nexo_partition import NexoPartition
+from .nexo_resource import NexoResource
 from .nexo_temperature import NexoTemperature
 from .nexo_thermostat import NexoThermostat
-from .nexo_blind_group import NexoBlindGroup
-from .nexo_group_dimmer import NexoGroupDimmer
-from .nexo_gate import NexoGate
-from .nexo_blind import NexoBlind
-from .nexo_partition import NexoPartition
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
@@ -125,24 +127,16 @@ class NexoBridge:
                 resource = self.get_resource_by_id(json_message["resources"][res]["id"])
                 if resource is not None and "state" in json_message["resources"][res]:
                     resource.state = json_message["resources"][res]["state"]
-                    resource.timestamp = json_message["resources"][res]["timestamp"]
                     resource.publish_update(self._loop)
 
-    def get_resource_by_id(self, resource_id):
-        if int(resource_id) in self.resources.keys():
+    def get_resource_by_id(self, resource_id) -> NexoResource | None:
+        if int(resource_id) in self.resources:
             return self.resources[int(resource_id)]
         return None
 
-    def get_resources_by_exact_type(self, resource_type):
-        return list(
-            filter(lambda x: type(x) is resource_type, list(self.resources.values()))
-        )
-
     def get_resources_by_type(self, resource_type):
         return list(
-            filter(
-                lambda x: isinstance(x, resource_type), list(self.resources.values())
-            )
+            filter(lambda x: type(x) is resource_type, list(self.resources.values()))
         )
 
     def on_error(self, web_socket, error):
