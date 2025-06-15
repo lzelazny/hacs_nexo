@@ -1,11 +1,14 @@
+"""Nexo Binary Sensor."""
+
 from .nexo_resource import NexoResource
 
 
 class NexoBinarySensor(NexoResource):
-    def __init__(self, web_socket, blocked=False, index=0, *args, **kwargs):
-        super().__init__(web_socket, *args, **kwargs)
+    """Nexo binary sensor resource."""
 
-    def is_on(self):
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if the binary sensor is on, False if off, None if unknown."""
         match self.state["value"]:
             case 101:
                 return False
