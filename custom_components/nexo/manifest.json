@@ -5,11 +5,12 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/lzelazny/hacs_nexo/blob/main/README.md",
+  "issue_tracker": "https://github.com/lzelazny/hacs_nexo/issues",
   "homekit": {},
   "iot_class": "local_push",
   "requirements": ["websocket-client==1.7.0", "rel==0.4.9"],
   "loggers": ["nexo"],
   "ssdp": [],
   "zeroconf": [],
-  "version": "1.2.0"
+  "version": "1.5.1"
 }
