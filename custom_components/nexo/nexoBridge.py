@@ -1,12 +1,13 @@
+"""Module for managing the NexoBridge WebSocket connection and resource handling."""
+
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
 from typing import Final
 
-import rel
-from sqlalchemy import null
-import websocket
+import websockets
+
+from homeassistant.core import HomeAssistant
 
 from .nexo_analog_sensor import NexoAnalogSensor
 from .nexo_binary_sensor import NexoBinarySensor
@@ -33,177 +34,171 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 
 class NexoBridge:
-    def __init__(self, local_ip) -> None:
-        self.__executor = ThreadPoolExecutor(max_workers=1)
-        self.ws = None
-        self.resources = dict()
-        self.local_ip = local_ip
-        self.raw_data_model = dict()
-        self.initialized = False
-        self._loop = asyncio.get_running_loop()
+    """Class for managing the NexoBridge WebSocket connection and resources."""
 
-    async def async_watchdog(self):
-        if self.ws.sock is None or self.ws.sock.getstatus() != 101:
-            print("Connection reconect")
-            await self.connect()
-        else:
-            asyncio.get_event_loop().call_later(
-                NEXO_RECONNECT_TIMEOUT,
-                lambda: asyncio.create_task(self.async_watchdog()),
-            )
+    def __init__(self, hass: HomeAssistant, ip) -> None:
+        """Initialize the NexoBridge instance."""
+        self._hass = hass
+        self.ip = ip
+        self._ws = None
+        self._resources = {}
+        self._raw_data_model = {}
+        self._initialized = False
+        self._task = None
+        self._stop_event = asyncio.Event()
 
-    def on_open(self, web_socket):
-        _LOGGER.info("Nexo integration started")
-
-    async def wait_for_initial_resources_load(self, timeout):
+    async def async_wait_for_initial_resources_load(self, timeout):
+        """Wait asynchronously for the initial resources to load or until the timeout expires."""
         t = timeout
-        while self.initialized is False and t > 0:
+        while self._initialized is False and t > 0:
             await asyncio.sleep(1)
             t = t - 1
 
     async def connect(self):
-        _LOGGER.info("Connecting... %s:%s", self.local_ip, 8766)
-        _LOGGER.info("Reconnect Timeout %s", NEXO_RECONNECT_TIMEOUT)
-        _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
-        # websocket.enableTrace(traceable=True)
-        if self.ws is not None:
-            self.ws.close()
+        """Establish and maintain the WebSocket connection."""
+        while not self._stop_event.is_set():
+            try:
+                async with websockets.connect(f"ws://{self.ip}:8766/") as websocket:
+                    _LOGGER.info("Connected to WebSocket: %s", self.ip)
+                    self._ws = websocket
+                    await self.listen()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning(
+                    "WebSocket error: %s. Attempting to reconnect in %s seconds",
+                    err,
+                    NEXO_RECONNECT_TIMEOUT,
+                )
+                await asyncio.sleep(NEXO_RECONNECT_TIMEOUT)
 
-        self.ws = websocket.WebSocketApp(
-            f"ws://{self.local_ip}:8766/",
-            on_open=self.on_open,
-            on_message=self.on_message,
-            on_error=self.on_error,
-            on_close=self.on_close,
-        )
-        self.ws.run_forever(
-            dispatcher=rel,
-            reconnect=NEXO_RECONNECT_TIMEOUT,
-            ping_interval=NEXO_RECONNECT_TIMEOUT,
-            ping_payload='{"type":"ping"}',
-        )
+    async def listen(self):
+        """Handle incoming messages from the WebSocket."""
+        async for message in self._ws:
+            _LOGGER.debug("Received message: %s", message)
+            json_message = json.loads(message)
+            if json_message["op"] == "initial_data":
+                self.on_message_initial_data(json_message)
+            if json_message["op"] == "data_update":
+                self.on_message_data_update(json_message)
 
-        if not rel.is_running():
-            self.__executor.submit(rel.dispatch)
+    async def start(self):
+        """Start the WebSocket client in the background."""
+        self._initialized = False
+        self._stop_event.clear()
+        self._task = asyncio.create_task(self.connect())
 
-        await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
-        await self.async_watchdog()
-
-    def on_message(self, web_socket, message):
-        _LOGGER.debug("Message: %s", message)
-        json_message = json.loads(message)
-
-        if json_message["op"] == "initial_data":
-            self.on_message_initial_data(json_message)
-
-        if json_message["op"] == "data_update":
-            self.on_message_data_update(json_message)
+    async def stop(self):
+        """Stop the client and close the connection."""
+        self._stop_event.set()
+        if self._ws:
+            await self._ws.close()
+        if self._task:
+            await self._task
 
     def on_message_initial_data(self, json_message):
-        print(">>>>>>>>>>>>>Initial")
-        print(json_message)
-        if len(self.raw_data_model.keys()) == 0 and len(json_message.keys()) > 0:
-            self.raw_data_model = json_message
+        """Handle the initial data message from the WebSocket."""
+        _LOGGER.debug(json_message)
+        if len(self._raw_data_model.keys()) == 0 and len(json_message.keys()) > 0:
+            self._raw_data_model = json_message
             self.update_resources()
         else:
             self.refresh_resources()
 
     def update_resources(self):
-        self.initialized = False
-        self.resources.clear()
-        for resource_id in dict(self.raw_data_model["resources"]):
-            self.add_resource(self.raw_data_model["resources"][resource_id])
-        self.initialized = True
-        print("AFTER INIT")
-        print(self.resources)
+        """Update resources based on the initial data model."""
+        _LOGGER.debug("INIT START")
+        self._resources.clear()
+        for resource_id in dict(self._raw_data_model["resources"]):
+            self.add_resource(self._raw_data_model["resources"][resource_id])
+        self._initialized = True
+        _LOGGER.debug("INIT END")
+        _LOGGER.debug("Resources: %s", self._resources)
 
     def refresh_resources(self):
-        for resource in self.resources.values():
-            resource.web_socket = self.ws
+        """Refresh resources with the current WebSocket connection."""
+        for resource in self._resources.values():
+            resource.web_socket = self._ws
 
     def on_message_data_update(self, json_message):
+        """Handle data update messages from the WebSocket."""
         if "resources" in json_message:
             for res in json_message["resources"]:
                 resource = self.get_resource_by_id(json_message["resources"][res]["id"])
                 if resource is not None and "state" in json_message["resources"][res]:
                     resource.state = json_message["resources"][res]["state"]
-                    resource.publish_update(self._loop)
+                    resource.publish_update(self._hass.loop)
 
     def get_resource_by_id(self, resource_id) -> NexoResource | None:
-        if int(resource_id) in self.resources:
-            return self.resources[int(resource_id)]
+        """Get a resource by its ID."""
+        if int(resource_id) in self._resources:
+            return self._resources[int(resource_id)]
         return None
 
     def get_resources_by_type(self, resource_type):
+        """Get resources filtered by type."""
         return list(
-            filter(lambda x: type(x) is resource_type, list(self.resources.values()))
+            filter(lambda x: type(x) is resource_type, list(self._resources.values()))
         )
 
-    def on_error(self, web_socket, error):
-        _LOGGER.error(error)
-
-    def on_close(self, web_socket, close_status_code, close_msg):
-        _LOGGER.error("Connection closed")
-
     def add_resource(self, nexo_resource):
+        """Add a resource based on its type."""
         nexo_resource_type = nexo_resource["type"]
         match nexo_resource_type:
             case "light":
-                obj = NexoLight(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoLight(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "sensor":
                 if "state" not in nexo_resource:
                     return None
-                obj = NexoBinarySensor(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoBinarySensor(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "analogsensor":
-                obj = NexoAnalogSensor(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoAnalogSensor(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "output":
-                obj = NexoOutput(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoOutput(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "temperature":
                 match nexo_resource["mode"]:
                     case 1:
-                        obj = NexoTemperature(self.ws, **nexo_resource)
+                        obj = NexoTemperature(self._ws, **nexo_resource)
                     case 2:
-                        obj = NexoThermostat(self.ws, **nexo_resource)
+                        obj = NexoThermostat(self._ws, **nexo_resource)
                     case _:
                         return None
-                self.resources[obj.id] = obj
+                self._resources[obj.id] = obj
                 return obj
 
             case "blind":
-                obj = NexoBlind(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoBlind(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "group_blind":
-                obj = NexoBlindGroup(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoBlindGroup(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "group_dimmer":
-                obj = NexoGroupDimmer(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoGroupDimmer(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "gate":
-                obj = NexoGate(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoGate(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case "partition":
-                obj = NexoPartition(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
+                obj = NexoPartition(self._ws, **nexo_resource)
+                self._resources[obj.id] = obj
                 return obj
 
             case _:

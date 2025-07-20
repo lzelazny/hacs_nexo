@@ -39,7 +39,7 @@ class NexoResource:
 
     async def _async_send(self, message) -> None:
         """Send a message to the websocket."""
-        self.web_socket.send(message)
+        await self.web_socket.send(message)
 
     async def _async_send_cmd(self, cmd) -> None:
         """Send a command message to the websocket."""

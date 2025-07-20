@@ -10,7 +10,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .nexoBridge import NexoBridge
+from .nexoBridge import NEXO_INIT_TIMEOUT, NexoBridge
 
 _LOGGER: Final = logging.getLogger(__name__)
 PLATFORMS: list[Platform | str] = [
@@ -26,24 +26,37 @@ PLATFORMS: list[Platform | str] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up NexoBridge instance and initiate connectivity."""
-    try:
-        ip = dict(entry.data)[CONF_HOST]
-        nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip)
-        _LOGGER.info("Connecting to multimedia card on IP: %s", ip)
+    """Inicjalizacja integracji na podstawie wpisu z UI."""
+    ip = dict(entry.data)[CONF_HOST]
+    if not ip:
+        _LOGGER.error("No IP address found in the entry configuration")
+        return False
 
-        await nexo.connect()
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        return True
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Connection Error")
+    client = NexoBridge(hass, ip)
+    await client.start()
 
-    return False
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+
+    hass.data[DOMAIN][entry.entry_id] = client
+
+    await client.async_wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    _LOGGER.info("Integration '%s' started", DOMAIN)
+    return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    """Stop the integration and disconnect the WebSocket client."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
+    client: NexoBridge = hass.data[DOMAIN].pop(entry.entry_id, None)
+    if client:
+        await client.stop()
+
+    if not hass.data[DOMAIN]:
+        hass.data.pop(DOMAIN)
+
+    _LOGGER.info("Integracja '%s' zatrzymana", DOMAIN)
     return unload_ok
