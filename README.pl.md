@@ -16,6 +16,14 @@
 - **Termostaty**  
 - **Bramy**  
 - **Strefy alarmowe**  
+- **Ściemniacze** - Włącz / Wyłącz / Ustaw jasność
+- **LED**  - Włącz / Wyłącz / Ustaw jasność
+- **Grupy Ściemniaczy, LEDów**  - Włącz / Wyłącz / Ustaw jasność
+- **Grupy Przełączników**  - Włącz / Wyłącz
+- **Stacja pogodowa** - Temperatura, Wiatr, Piktogram pogody, Kierunek wiatru, Kierunek światła, Prognoza z Open-Meteo
+
+## TO DO:
+- **Grupy Rolet** – Otwórz / Zamknij / Zatrzymaj / Ustaw pozycję 
 
 ## Instalacja
 

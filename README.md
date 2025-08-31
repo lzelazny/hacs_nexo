@@ -19,6 +19,14 @@ This integration currently supports:
 - **Thermostats**  
 - **Gates**  
 - **Alarm Partitions**
+- **Dimmers** - On/Off / Brightness
+- **LED** - On/Off / Brightness
+- **Dimmers, LED Groups** - On/Off / Brightness
+- **Switches Groups**  - On/Off
+- **Weather station** - Temperature, Wind, Weather pictogram, Wind direction, Light direction, Forecast from Open-Meteo
+
+## TO DO:
+- **Blinds Groups** – Open / Close / Stop / Set Position 
 
 
 ## Installation

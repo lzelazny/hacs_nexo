@@ -22,6 +22,7 @@ PLATFORMS: list[Platform | str] = [
     Platform.LOCK,
     Platform.SENSOR,
     Platform.SWITCH,
+    Platform.WEATHER,
 ]
 
 
@@ -31,13 +32,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ip = dict(entry.data)[CONF_HOST]
         nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip)
         _LOGGER.info("Connecting to multimedia card on IP: %s", ip)
-
         await nexo.connect()
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Connection Error")
-
+    except (asyncio.TimeoutError, OSError) as e:
+        _LOGGER.error("Connection error to %s: %s", entry.data.get(CONF_HOST), e)
+    except Exception:
+        _LOGGER.exception("Unexpected error while setting up Nexo")
     return False
 
 

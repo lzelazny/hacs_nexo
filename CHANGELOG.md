@@ -1,3 +1,13 @@
+## [1.6.0] - 19.03.2024
+
+### Added
+- Dimmers integration - On/Off / Brightness
+- LED integration - On/Off / Brightness
+- Dimmers, LED Groups integration - On/Off / Brightness
+- Switches Groups integration  - On/Off
+- Weather station integration - Temperature, Wind, Weather pictogram, Wind direction, Light direction, Forecast from Open-Meteo
+
+
 ## [1.2.0] - 19.03.2024
 
 ### Added

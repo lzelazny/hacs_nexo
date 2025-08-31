@@ -69,11 +69,6 @@ class NexoResource:
 
     def publish_update(self, _loop) -> None:
         """Notify Home Assistant about a state change."""
-        for callback in self._callbacks:
-            self._LOGGER.debug(
-                "Notifying HA about state change of device id: %s type: %s to state %s",
-                self.id,
-                self.name,
-                self.state,
-            )
+        for callback in tuple(self._callbacks):
+            # Usunięto hałaśliwy debug przy każdym update
             asyncio.run_coroutine_threadsafe(self._wrapper(callback), _loop)
