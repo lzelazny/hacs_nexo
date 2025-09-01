@@ -1,4 +1,4 @@
-## [1.6.0] - 19.03.2024
+## [1.6.0] - 31.08.2025
 
 ### Added
 - Dimmers integration - On/Off / Brightness
