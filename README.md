@@ -7,7 +7,6 @@
 
 ## Supported Features
 
-
 This integration currently supports:
 
 - **Lights** – On/Off  
@@ -19,6 +18,13 @@ This integration currently supports:
 - **Thermostats**  
 - **Gates**  
 - **Alarm Partitions**
+- **Dimmers** - On/Off / Brightness
+- **LED** - On/Off / Brightness
+- **Dimmers, LED Groups** - On/Off / Brightness
+- **Switches Groups**  - On/Off
+- **Blinds Groups** – Open / Close / Stop / Set Position 
+- **Weather station** - Temperature, Wind, Weather pictogram, Wind direction, Light direction, Forecast from Open-Meteo
+- **Ext commands**
 
 
 ## Installation
@@ -41,6 +47,45 @@ To install the integration:
 5. **You're all set! Enjoy your integration.**
 
    ![Enjoy](img/enjoy.jpg)
+
+
+## Ext commands - how to
+
+If you use command-triggered automation in Nexo, you can use these commands in HA in three ways (example command "gateway"):
+
+1. Service
+
+   **Developer tools → Actions:** > action: **nexo.send_ext_command** > cmd **gateway**
+
+2. Entity Button
+
+   **Add to dashboard** > by entity > entity **gateway** > **Continue
+   **Add to dashboard** > by card > **Button** > entity **gateway** > Interactions > Perform action > action: **nexo.send_ext_command** > cmd **gateway** > **Save**
+
+   After clicking it sends {"type":"ext_command","cmd":"gateway"}.
+
+   In order for the entity with the command to be displayed, the list of commands must be manually entered in configuration.yaml at the root level (just like automation: etc.): #unfortunately, I cannot download them automatically - TO DO
+
+```
+nexo:
+  ext_commands:
+    - gateway
+    - door
+    - any_command
+```
+
+3. Automation in YAML
+
+```
+alias: Open the gate at 7:00
+trigger:
+  - platform: time
+    at: "07:00:00"
+action:
+  - service: nexo.send_ext_command
+    data:
+      cmd: brama
+```
 
     
 ## License

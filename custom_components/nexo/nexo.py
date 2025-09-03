@@ -18,13 +18,21 @@ class HANexo:
         self._nexo_resource: NexoResource = nexo_resource
 
     @property
-    def name(self) -> str:
-        """Return the display name of this output."""
+    def name(self):
+        # Jeśli encja sama ustawiła _attr_name (np. weather), użyj tego
+        if getattr(self, "_attr_name", None):
+            return self._attr_name
+        # Jeśli nie ma przypisanego zasobu, zwróć None (HA to akceptuje)
+        if self._nexo_resource is None:
+            return None
         return str(self._nexo_resource.name)
 
     @property
-    def unique_id(self) -> str:
-        """Return the id of this Nexo gate."""
+    def unique_id(self):
+        # Bezpiecznik na brak zasobu
+        if self._nexo_resource is None:
+            # daj stabilny fallback – jedna encja pogody na integrację
+            return "nexo-weather"
         return str(self._nexo_resource.id)
 
     async def async_added_to_hass(self) -> None:
