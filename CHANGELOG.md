@@ -1,3 +1,14 @@
+## [1.6.3] - 03.09.2025
+
+### Added
+- Blinds / Covers Groups integration
+- Ext commands (Automation / Smart)
+
+### Fixed
+- Switches Groups integration
+
+
+
 ## [1.6.0] - 31.08.2025
 
 ### Added
