@@ -1,0 +1,9 @@
+send_ext_command:
+  name: Send Nexo external command
+  description: Send an 'ext_command' to the Nexo bridge (triggers automation on the Nexo side)
+  fields:
+    cmd:
+      required: true
+      example: brama
+      selector:
+        text:

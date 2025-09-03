@@ -48,6 +48,9 @@ class NexoBridge:
         self._weather: List[NexoWeather] = []
         self._weather_listeners: List[Callable[[], None]] = []
 
+        # Lista dostępnych ext_command (zbierana z op="modifications")
+        self._ext_commands: set[str] = set()
+
     # ---------------- Core WS lifecycle ----------------
 
     async def async_watchdog(self) -> None:
@@ -148,6 +151,10 @@ class NexoBridge:
                 self.on_message_set_weather(json_message)
             except Exception as e:
                 _LOGGER.exception("Failed to parse set_weather: %s", e)
+            return
+
+        if op == "modifications":
+            self.on_message_modifications(json_message)
             return
 
     def on_message_initial_data(self, json_message: dict) -> None:
@@ -311,3 +318,27 @@ class NexoBridge:
 
         self.resources[obj.id] = obj
         return obj
+
+    # ---------------- ext_command support ----------------
+
+    def get_ext_commands(self) -> list[str]:
+        """Return discovered ext_command names."""
+        try:
+            return sorted(self._ext_commands)
+        except AttributeError:
+            # fallback w razie braku inicjalizacji
+            self._ext_commands = set()
+            return []
+
+    def on_message_modifications(self, json_message: dict) -> None:
+        """Capture available ext_commands from 'modifications' op."""
+        try:
+            mods = json_message.get("modifications") or {}
+            exts = mods.get("ext_commands") or {}
+            for scope_key in ("to_system", "to_user"):
+                scope = exts.get(scope_key) or {}
+                for cmd_name in scope.keys():
+                    self._ext_commands.add(str(cmd_name))
+            _LOGGER.debug("ext_commands discovered: %s", sorted(self._ext_commands))
+        except Exception as e:
+            _LOGGER.debug("Failed to parse ext_commands: %s", e)
