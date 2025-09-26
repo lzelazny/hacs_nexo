@@ -5,7 +5,6 @@ import logging
 from typing import Final
 
 import rel
-from sqlalchemy import null
 import websocket
 
 from .nexo_analog_sensor import NexoAnalogSensor
@@ -15,6 +14,7 @@ from .nexo_blind_group import NexoBlindGroup
 from .nexo_gate import NexoGate
 from .nexo_group_dimmer import NexoGroupDimmer
 from .nexo_light import NexoLight
+from .nexo_light_dimmable import NexoDimmableLight
 from .nexo_output import NexoOutput
 from .nexo_partition import NexoPartition
 from .nexo_resource import NexoResource
@@ -36,9 +36,9 @@ class NexoBridge:
     def __init__(self, local_ip) -> None:
         self.__executor = ThreadPoolExecutor(max_workers=1)
         self.ws = None
-        self.resources = dict()
+        self.resources = {}
         self.local_ip = local_ip
-        self.raw_data_model = dict()
+        self.raw_data_model = {}
         self.initialized = False
         self._loop = asyncio.get_running_loop()
 
@@ -113,9 +113,16 @@ class NexoBridge:
         self.resources.clear()
         for resource_id in dict(self.raw_data_model["resources"]):
             self.add_resource(self.raw_data_model["resources"][resource_id])
+
+        # self.add_weather_station(self.raw_data_model["weather_station"])
         self.initialized = True
         print("AFTER INIT")
         print(self.resources)
+
+    def add_weather_station(self, weather_station):
+        if weather_station is not None and len(weather_station.keys()) > 0:
+            for resource_id in dict(weather_station):
+                self.add_resource(weather_station[resource_id])
 
     def refresh_resources(self):
         for resource in self.resources.values():
@@ -149,26 +156,37 @@ class NexoBridge:
         nexo_resource_type = nexo_resource["type"]
         match nexo_resource_type:
             case "light":
-                obj = NexoLight(self.ws, **nexo_resource)
-                self.resources[obj.id] = obj
-                return obj
+                if "state" in nexo_resource and "brightness" in nexo_resource["state"]:
+                    # This is a dimmable light
+                    obj = NexoDimmableLight(self.ws, **nexo_resource)
+                    self.resources[obj.id] = obj
+                else:
+                    # This is a simple light
+                    obj = NexoLight(self.ws, **nexo_resource)
+                    self.resources[obj.id] = obj
 
+            case "led":
+                if "state" in nexo_resource and "brightness" in nexo_resource["state"]:
+                    # This is a dimmable LED
+                    obj = NexoDimmableLight(self.ws, **nexo_resource)
+                    self.resources[obj.id] = obj
+                else:
+                    # This is a simple LLED
+                    obj = NexoLight(self.ws, **nexo_resource)
+                    self.resources[obj.id] = obj
             case "sensor":
                 if "state" not in nexo_resource:
-                    return None
+                    return
                 obj = NexoBinarySensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "analogsensor":
                 obj = NexoAnalogSensor(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "output":
                 obj = NexoOutput(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "temperature":
                 match nexo_resource["mode"]:
@@ -177,34 +195,32 @@ class NexoBridge:
                     case 2:
                         obj = NexoThermostat(self.ws, **nexo_resource)
                     case _:
-                        return None
+                        return
                 self.resources[obj.id] = obj
-                return obj
 
             case "blind":
                 obj = NexoBlind(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "group_blind":
                 obj = NexoBlindGroup(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "group_dimmer":
                 obj = NexoGroupDimmer(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "gate":
                 obj = NexoGate(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case "partition":
                 obj = NexoPartition(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
-                return obj
 
             case _:
-                print(f"not supported {type}")
+                _LOGGER.warning(
+                    "Unsupported resource type %s, id %s",
+                    nexo_resource_type,
+                    nexo_resource["id"],
+                )

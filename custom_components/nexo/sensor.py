@@ -25,8 +25,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up."""
     nexo: NexoBridge = hass.data[DOMAIN][entry.entry_id]
+
     async_add_entities(
-        NexoAnalogSensor(sensor)
+        HANexoAnalogSensor(sensor)
         for sensor in nexo.get_resources_by_type(NexoAnalogSensor)
     )
     async_add_entities(
