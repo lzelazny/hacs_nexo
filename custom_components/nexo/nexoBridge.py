@@ -276,16 +276,16 @@ class NexoBridge:
                 obj = NexoLight(self.ws, **nexo_resource)
             case "dimmer":
                 obj = NexoDimmer(self.ws, **nexo_resource)
-                _LOGGER.warning("NexoBridge: dodano DIMMER %s", obj.id)
+                _LOGGER.debug("NexoBridge: dodano DIMMER %s", obj.id)
             case "led":
                 obj = NexoLed(self.ws, **nexo_resource)
-                _LOGGER.warning("NexoBridge: dodano LED %s", obj.id)
+                _LOGGER.debug("NexoBridge: dodano LED %s", obj.id)
             case "group_led":
                 obj = NexoGroupLed(self.ws, **nexo_resource)
-                _LOGGER.warning("NexoBridge: dodano GROUP_LED %s", obj.id)
+                _LOGGER.debug("NexoBridge: dodano GROUP_LED %s", obj.id)
             case "group_output":
                 obj = NexoGroupOutput(self.ws, **nexo_resource)
-                _LOGGER.warning("NexoBridge: dodano GROUP_OUTPUT %s", obj.id)
+                _LOGGER.debug("NexoBridge: dodano GROUP_OUTPUT %s", obj.id)
             case "sensor":
                 if "state" not in nexo_resource:
                     return None

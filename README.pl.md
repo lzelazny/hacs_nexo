@@ -56,6 +56,7 @@ Jeżeli w Nexo używasz automatyki wyzwalanej komendami to możesz użyć tych k
 2. Encje Button
 
    **Dodaj do pulpitu** > wg. encji > encja **brama** > **Kontynuuj
+   
    **Dodaj do pulpitu** > wg. karty > **Przycisk** > encja **brama** > Interakcje > Wykonaj akcję > akcja: **nexo.send_ext_command** > cmd **brama** > **Zapisz**
 
    Po kliknięciu wysyła {"type":"ext_command","cmd":"brama"}.

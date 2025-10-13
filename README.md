@@ -60,6 +60,7 @@ If you use command-triggered automation in Nexo, you can use these commands in H
 2. Entity Button
 
    **Add to dashboard** > by entity > entity **gateway** > **Continue
+   
    **Add to dashboard** > by card > **Button** > entity **gateway** > Interactions > Perform action > action: **nexo.send_ext_command** > cmd **gateway** > **Save**
 
    After clicking it sends {"type":"ext_command","cmd":"gateway"}.
