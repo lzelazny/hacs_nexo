@@ -2,9 +2,10 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
+import threading
+import time
 from typing import Final
 
-import rel
 import websocket
 
 from .nexo_analog_sensor import NexoAnalogSensor
@@ -21,6 +22,7 @@ from .nexo_resource import NexoResource
 from .nexo_temperature import NexoTemperature
 from .nexo_thermostat import NexoThermostat
 
+
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
 NEXO_RESOURCE_TYPE_OUTPUT = "output"
 NEXO_RESOURCE_TYPE_SENSOR = "sensor"
@@ -28,112 +30,174 @@ NEXO_RESOURCE_TYPE_ANALOG_SENSOR = "analogsensor"
 NEXO_RESOURCE_TYPE_LIGHT = "light"
 NEXO_INIT_TIMEOUT = 10
 NEXO_RECONNECT_TIMEOUT = 5
+NEXO_PING_INTERVAL = 30
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
 class NexoBridge:
     def __init__(self, local_ip) -> None:
-        self.__executor = ThreadPoolExecutor(max_workers=1)
         self.ws = None
         self.resources = {}
         self.local_ip = local_ip
         self.raw_data_model = {}
         self.initialized = False
-        self._loop = asyncio.get_running_loop()
 
-    async def async_watchdog(self):
-        if self.ws.sock is None or self.ws.sock.getstatus() != 101:
-            print("Connection reconect")
-            await self.connect()
-        else:
-            asyncio.get_event_loop().call_later(
-                NEXO_RECONNECT_TIMEOUT,
-                lambda: asyncio.create_task(self.async_watchdog()),
+        self._loop = asyncio.get_running_loop()
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+        self._keep_running = False
+        self._ws_thread = None
+        self._watchdog_task = None
+
+    def _run_websocket(self) -> None:
+        """Pętla reconnect w osobnym wątku (bez rel)."""
+        while self._keep_running:
+            try:
+                _LOGGER.info("Connecting to Nexo... %s:8766", self.local_ip)
+
+                self.ws = websocket.WebSocketApp(
+                    f"ws://{self.local_ip}:8766/",
+                    on_open=self.on_open,
+                    on_message=self.on_message,
+                    on_error=self.on_error,
+                    on_close=self.on_close,
+                )
+                # Bez ping_* – watchdog wysyła JSON ping (text frame)
+                self.ws.run_forever()
+
+            except Exception as e:
+                _LOGGER.error("WebSocket runtime error: %s", e)
+
+            if self._keep_running:
+                _LOGGER.warning(
+                    "Nexo WS disconnected. Reconnecting in %s s...",
+                    NEXO_RECONNECT_TIMEOUT,
+                )
+                time.sleep(NEXO_RECONNECT_TIMEOUT)
+
+    async def _stop_ws_thread(self) -> None:
+        """Zatrzymuje wątek WS bez blokowania Event Loop HA."""
+        self._keep_running = False
+
+        if self.ws is not None:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
+
+        if self._ws_thread is not None and self._ws_thread.is_alive():
+            # join w executorze – nie blokuje pętli asynchronicznej
+            await self._loop.run_in_executor(
+                self._executor,
+                lambda: self._ws_thread.join(timeout=5),
             )
 
-    def on_open(self, web_socket):
-        _LOGGER.info("Nexo integration started")
+    async def connect(self) -> None:
+        _LOGGER.info("Initializing Nexo connection...")
 
-    async def wait_for_initial_resources_load(self, timeout):
-        t = timeout
-        while self.initialized is False and t > 0:
-            await asyncio.sleep(1)
-            t = t - 1
+        # Zatrzymaj poprzedni wątek jeśli istnieje
+        await self._stop_ws_thread()
 
-    async def connect(self):
-        _LOGGER.info("Connecting... %s:%s", self.local_ip, 8766)
-        _LOGGER.info("Reconnect Timeout %s", NEXO_RECONNECT_TIMEOUT)
-        _LOGGER.info("Init Timeout %s", NEXO_INIT_TIMEOUT)
-        # websocket.enableTrace(traceable=True)
-        if self.ws is not None:
-            self.ws.close()
+        # Zatrzymaj poprzedni watchdog
+        if self._watchdog_task is not None and not self._watchdog_task.done():
+            self._watchdog_task.cancel()
+            try:
+                await self._watchdog_task
+            except asyncio.CancelledError:
+                pass
 
-        self.ws = websocket.WebSocketApp(
-            f"ws://{self.local_ip}:8766/",
-            on_open=self.on_open,
-            on_message=self.on_message,
-            on_error=self.on_error,
-            on_close=self.on_close,
+        # Uruchom nowy wątek WS
+        self._keep_running = True
+        self._ws_thread = threading.Thread(
+            target=self._run_websocket,
+            daemon=True,
         )
-        self.ws.run_forever(
-            dispatcher=rel,
-            reconnect=NEXO_RECONNECT_TIMEOUT,
-            ping_interval=NEXO_RECONNECT_TIMEOUT,
-            ping_payload='{"type":"ping"}',
-        )
-
-        if not rel.is_running():
-            self.__executor.submit(rel.dispatch)
+        self._ws_thread.start()
 
         await self.wait_for_initial_resources_load(NEXO_INIT_TIMEOUT)
-        await self.async_watchdog()
 
-    def on_message(self, web_socket, message):
+        # Uruchom watchdog
+        self._watchdog_task = self._loop.create_task(self.async_watchdog())
+
+    async def async_watchdog(self) -> None:
+        """
+        Wysyła JSON ping co NEXO_PING_INTERVAL sekund.
+        Jeśli send() rzuci wyjątek — zamyka socket, a _run_websocket zrobi reconnect.
+        """
+        while self._keep_running:
+            await asyncio.sleep(NEXO_PING_INTERVAL)
+
+            if self.ws is None:
+                continue
+
+            try:
+                self.ws.send('{"type":"ping"}')
+                _LOGGER.debug("Nexo WS: ping sent")
+            except Exception as e:
+                _LOGGER.warning(
+                    "Nexo WS: ping failed (%s) — forcing reconnect",
+                    e,
+                )
+                try:
+                    self.ws.close()
+                except Exception:
+                    pass
+                await asyncio.sleep(NEXO_RECONNECT_TIMEOUT + 1)
+
+    def on_open(self, web_socket) -> None:
+        _LOGGER.info("Nexo integration started / reconnected")
+        if self.initialized:
+            self.refresh_resources()
+
+    async def wait_for_initial_resources_load(self, timeout: int) -> None:
+        t = timeout
+        while not self.initialized and t > 0:
+            await asyncio.sleep(1)
+            t -= 1
+
+    def on_message(self, web_socket, message: str) -> None:
         _LOGGER.debug("Message: %s", message)
         json_message = json.loads(message)
 
-        if json_message["op"] == "initial_data":
+        if json_message.get("op") == "initial_data":
             self.on_message_initial_data(json_message)
 
-        if json_message["op"] == "data_update":
+        if json_message.get("op") == "data_update":
             self.on_message_data_update(json_message)
 
-    def on_message_initial_data(self, json_message):
-        print(">>>>>>>>>>>>>Initial")
-        print(json_message)
-        if len(self.raw_data_model.keys()) == 0 and len(json_message.keys()) > 0:
+    def on_message_initial_data(self, json_message: dict) -> None:
+        if not self.raw_data_model and json_message:
             self.raw_data_model = json_message
             self.update_resources()
         else:
             self.refresh_resources()
 
-    def update_resources(self):
+    def update_resources(self) -> None:
         self.initialized = False
         self.resources.clear()
+
         for resource_id in dict(self.raw_data_model["resources"]):
             self.add_resource(self.raw_data_model["resources"][resource_id])
 
-        # self.add_weather_station(self.raw_data_model["weather_station"])
         self.initialized = True
-        print("AFTER INIT")
-        print(self.resources)
 
-    def add_weather_station(self, weather_station):
-        if weather_station is not None and len(weather_station.keys()) > 0:
+    def add_weather_station(self, weather_station: dict) -> None:
+        if weather_station and len(weather_station.keys()) > 0:
             for resource_id in dict(weather_station):
                 self.add_resource(weather_station[resource_id])
 
-    def refresh_resources(self):
+    def refresh_resources(self) -> None:
         for resource in self.resources.values():
             resource.web_socket = self.ws
 
-    def on_message_data_update(self, json_message):
+    def on_message_data_update(self, json_message: dict) -> None:
         if "resources" in json_message:
             for res in json_message["resources"]:
-                resource = self.get_resource_by_id(json_message["resources"][res]["id"])
-                if resource is not None and "state" in json_message["resources"][res]:
-                    resource.state = json_message["resources"][res]["state"]
+                res_obj = json_message["resources"][res]
+                resource = self.get_resource_by_id(res_obj["id"])
+                if resource is not None and "state" in res_obj:
+                    resource.state = res_obj["state"]
                     resource.publish_update(self._loop)
 
     def get_resource_by_id(self, resource_id) -> NexoResource | None:
@@ -143,37 +207,36 @@ class NexoBridge:
 
     def get_resources_by_type(self, resource_type):
         return list(
-            filter(lambda x: type(x) is resource_type, list(self.resources.values()))
+            filter(
+                lambda x: type(x) is resource_type,
+                list(self.resources.values()),
+            )
         )
 
-    def on_error(self, web_socket, error):
-        _LOGGER.error(error)
+    def on_error(self, web_socket, error) -> None:
+        _LOGGER.error("Nexo WS Error: %s", error)
 
-    def on_close(self, web_socket, close_status_code, close_msg):
-        _LOGGER.error("Connection closed")
+    def on_close(self, web_socket, close_status_code, close_msg) -> None:
+        _LOGGER.warning("Nexo WebSocket closed: %s", close_msg)
 
-    def add_resource(self, nexo_resource):
+    def add_resource(self, nexo_resource: dict) -> None:
         nexo_resource_type = nexo_resource["type"]
+
         match nexo_resource_type:
             case "light":
                 if "state" in nexo_resource and "brightness" in nexo_resource["state"]:
-                    # This is a dimmable light
                     obj = NexoDimmableLight(self.ws, **nexo_resource)
-                    self.resources[obj.id] = obj
                 else:
-                    # This is a simple light
                     obj = NexoLight(self.ws, **nexo_resource)
-                    self.resources[obj.id] = obj
+                self.resources[obj.id] = obj
 
             case "led":
                 if "state" in nexo_resource and "brightness" in nexo_resource["state"]:
-                    # This is a dimmable LED
                     obj = NexoDimmableLight(self.ws, **nexo_resource)
-                    self.resources[obj.id] = obj
                 else:
-                    # This is a simple LLED
                     obj = NexoLight(self.ws, **nexo_resource)
-                    self.resources[obj.id] = obj
+                self.resources[obj.id] = obj
+
             case "sensor":
                 if "state" not in nexo_resource:
                     return

@@ -23,52 +23,63 @@ class NexoResource:
 
     @property
     def id(self) -> str:
-        """Return the id of the resource."""
         return self._id
 
     @property
     def name(self) -> str:
-        """Return the name of the resource."""
         return self._name
 
     async def _wrapper(self, awaitable):
-        """Return the result of the awaitable."""
         if awaitable is not None:
             return await awaitable()
         return None
 
     async def _async_send(self, message) -> None:
-        """Send a message to the websocket."""
-        self.web_socket.send(message)
+        """Send a message to the websocket — safe, non-crashing."""
+        try:
+            self.web_socket.send(message)
+        except (
+            BrokenPipeError,
+            OSError,
+            websocket.WebSocketConnectionClosedException,
+            websocket.WebSocketException,
+        ) as ex:
+            self._LOGGER.warning(
+                "Nexo WS: send failed for resource id=%s name=%s — "
+                "waiting for auto-reconnect. Error: %s",
+                self._id,
+                self._name,
+                ex,
+            )
+        except Exception as ex:
+            self._LOGGER.error(
+                "Nexo WS: unexpected send error for resource id=%s: %s",
+                self._id,
+                ex,
+            )
 
     async def _async_send_cmd(self, cmd) -> None:
-        """Send a command message to the websocket."""
         await self._async_send(f'{{"type":"resource","id":{self.id},"cmd":{{{cmd}}}}}')
 
     async def _async_send_cmd_operation_custom(self, operation, **kwargs) -> None:
-        """Send a custom operation command message to the websocket."""
         cmd = f'"operation":{operation}'
         if kwargs:
-            cmd += f",{','.join(f'"{key}":{value}' for key, value in kwargs.items())}"
+            cmd += f",{','.join(f'\"{key}\":{value}' for key, value in kwargs.items())}"
         await self._async_send_cmd(cmd)
 
     async def _async_send_cmd_operation(self, operation, value=None) -> None:
-        """Send an operation command message to the websocket."""
         if value is None:
             await self._async_send_cmd_operation_custom(operation)
         else:
             await self._async_send_cmd_operation_custom(operation, value=value)
 
     def register_callback(self, callback: Callable[[], None]) -> None:
-        """Register a callback to be called when the resource state changes."""
         self._callbacks.add(callback)
 
     def remove_callback(self, callback: Callable[[], None]) -> None:
-        """Remove a callback."""
         self._callbacks.discard(callback)
 
     def publish_update(self, _loop) -> None:
-        """Notify Home Assistant about a state change."""
         for callback in self._callbacks:
             self._LOGGER.debug(
                 "Notifying HA about state change of device id: %s type: %s to state %s",

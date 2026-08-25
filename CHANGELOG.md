@@ -1,3 +1,11 @@
+## [Unreleased]
+
+### Fixed
+- Stabilized Nexo WebSocket reconnect flow by removing rel-based dispatcher handling and running the connection loop in a dedicated thread.
+- Added watchdog ping logic to keep the connection alive and trigger reconnect when the socket stops responding.
+- Improved initialization and resource load handling to avoid stale or broken connection states during startup.
+- Hardened WebSocket error handling and reconnect timing for more reliable operation in Home Assistant.
+
 ## [1.2.0] - 19.03.2024
 
 ### Added
