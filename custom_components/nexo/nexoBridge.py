@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
+import socket
 import threading
 from typing import Final
 
@@ -107,15 +108,23 @@ class NexoBridge:
     async def _close_websocket(self, web_socket) -> None:
         """Abort blocked I/O before a graceful close can wait for the send lock."""
         web_socket.keep_running = False
+        connection = getattr(web_socket, "sock", None)
+        raw_socket = getattr(connection, "sock", None)
 
         def close() -> None:
             # websocket-client's close() sends a frame while holding its send lock.
             # abort() shuts down the underlying socket without acquiring that lock,
             # releasing blocked sends/receives before the close handshake begins.
-            socket = getattr(web_socket, "sock", None)
-            if socket is not None:
+            # A peer close can clear connection.connected before taking that lock.
+            # Shut down the captured raw socket even when abort() would skip it.
+            if raw_socket is not None:
                 try:
-                    socket.abort()
+                    raw_socket.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+            if connection is not None:
+                try:
+                    connection.abort()
                 except OSError:
                     pass
             web_socket.close()

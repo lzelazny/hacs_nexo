@@ -183,6 +183,26 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         old_socket.close.assert_called_once()
         new_socket.close.assert_not_called()
 
+    async def test_peer_close_flag_does_not_prevent_raw_socket_shutdown(self):
+        started, release = threading.Event(), threading.Event()
+        shutdown = Mock(side_effect=lambda _how: release.set())
+        def send(_payload):
+            started.set()
+            release.wait(3)
+        # websocket-client abort() is a no-op after send_close() clears connected.
+        connection = SimpleNamespace(connected=False, abort=Mock(),
+                                     sock=SimpleNamespace(shutdown=shutdown))
+        self.bridge.ws = SimpleNamespace(sock=connection, send=send, close=Mock())
+        command = asyncio.create_task(self.bridge.async_send_ext_command("open"))
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 1))
+            await asyncio.wait_for(self.bridge.disconnect(), timeout=1)
+            await asyncio.wait_for(asyncio.shield(command), timeout=1)
+            shutdown.assert_called_once_with(BRIDGE.socket.SHUT_RDWR)
+        finally:
+            release.set()
+            await command
+
 
 class EntryTests(unittest.IsolatedAsyncioTestCase):
     def make_hass(self, unload=True):
