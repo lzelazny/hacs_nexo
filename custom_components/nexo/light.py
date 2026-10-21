@@ -14,6 +14,9 @@ from .const import DOMAIN
 from .nexo import HANexo
 from .nexo_light import NexoLight
 from .nexo_light_dimmable import NexoDimmableLight
+from .nexo_dimmer import NexoDimmer
+from .nexo_group_dimmer import NexoGroupDimmer
+from .nexo_group_led import NexoGroupLed
 from .nexoBridge import NexoBridge
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -31,7 +34,13 @@ async def async_setup_entry(
 
     async_add_entities(
         HANexoDimmableLight(light)
-        for light in nexo.get_resources_by_type(NexoDimmableLight)
+        for resource_type in (
+            NexoDimmableLight,
+            NexoDimmer,
+            NexoGroupDimmer,
+            NexoGroupLed,
+        )
+        for light in nexo.get_resources_by_type(resource_type)
     )
 
 
@@ -42,7 +51,7 @@ class HANexoLight(HANexo, LightEntity):
         """Initialize the Nexo light."""
         super().__init__(nexo_resource=nexo_light)
         self._nexo_light: NexoLight = nexo_light
-        self._attr_supported_color_modes = ColorMode.ONOFF
+        self._attr_supported_color_modes = {ColorMode.ONOFF}
         self._attr_color_mode = ColorMode.ONOFF
 
     @property
@@ -50,11 +59,11 @@ class HANexoLight(HANexo, LightEntity):
         """Return the state of the light."""
         return self._nexo_light.is_on
 
-    async def async_turn_on(self):
+    async def async_turn_on(self, **kwargs):
         """Turn device on."""
         await self._nexo_light.async_turn_on()
 
-    async def async_turn_off(self):
+    async def async_turn_off(self, **kwargs):
         """Turn device off."""
         await self._nexo_light.async_turn_off()
 
@@ -66,7 +75,7 @@ class HANexoDimmableLight(HANexoLight):
         """Initialize the Nexo Dimmable light."""
         super().__init__(nexo_light)
         self._nexo_light: NexoDimmableLight = nexo_light
-        self._attr_supported_color_modes = ColorMode.BRIGHTNESS
+        self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
         self._attr_color_mode = ColorMode.BRIGHTNESS
 
     @property

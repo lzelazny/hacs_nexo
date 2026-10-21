@@ -15,5 +15,16 @@
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nexo commands",
+        "description": "Enter comma separated external command names. Commands announced by the bridge are also added automatically.",
+        "data": {
+          "ext_commands": "External commands"
+        }
+      }
+    }
   }
 }

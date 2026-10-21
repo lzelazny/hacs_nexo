@@ -10,8 +10,9 @@
 
 This integration currently supports:
 
-- **Lights** – On/Off  
-- **Switches** – On/Off  
+- **Lights and LEDs** – On/Off and brightness for dimmable resources
+- **Dimmers and lighting groups** – Brightness, including LED groups
+- **Switches and output groups** – On/Off
 - **Binary Sensors** – On/Off  
 - **Analog Sensors**
 - **Blinds** – Open / Close / Stop / Set Position
@@ -19,6 +20,23 @@ This integration currently supports:
 - **Thermostats**  
 - **Gates**  
 - **Alarm Partitions**
+- **Local weather station** – Temperature, wind and light observations
+- **External commands** – Buttons for Nexo automations
+
+### External command buttons
+
+Commands announced by the bridge are added automatically, including commands
+received after startup. To add command names manually, open the Nexo integration's
+**Configure** dialog and enter comma separated names under **External commands**.
+Saving options reloads that integration entry. Each button targets its own bridge
+and uses the current connection after reconnecting.
+
+### Local weather
+
+Weather observations come from the multimedia card's `set_weather` messages.
+The weather entity becomes available when the station reports observations.
+Temperature is reported in °C and wind speed in m/s, with unit conversion handled
+by Home Assistant. No external forecast service is required.
 
 
 ## Installation
