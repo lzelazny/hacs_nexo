@@ -1,12 +1,12 @@
 """Nexo Group Dimmer."""
 
-from .nexo_resource import NexoResource
+from .nexo_dimmer import NexoDimmer
 
 
-class NexoGroupDimmer(NexoResource):
+class NexoGroupDimmer(NexoDimmer):
     """Nexo group dimmer resource."""
 
-    def __init__(self, web_socket, ios, *args, **kwargs) -> None:
+    def __init__(self, web_socket, *args, ios=None, **kwargs) -> None:
         """Initialize the Nexo group dimmer resource."""
         super().__init__(web_socket, *args, **kwargs)
         self.ios = ios

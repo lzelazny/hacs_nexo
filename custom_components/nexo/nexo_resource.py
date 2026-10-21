@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Callable
+import inspect
 import logging
 from typing import Final
 
@@ -29,15 +30,19 @@ class NexoResource:
     def name(self) -> str:
         return self._name
 
-    async def _wrapper(self, awaitable):
-        if awaitable is not None:
-            return await awaitable()
-        return None
+    async def _wrapper(self, callback):
+        """Run synchronous or asynchronous entity callbacks on the HA loop."""
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+        except Exception:
+            self._LOGGER.exception("Nexo resource callback failed for %s", self.id)
 
     async def _async_send(self, message) -> None:
         """Send a message to the websocket — safe, non-crashing."""
         try:
-            self.web_socket.send(message)
+            await asyncio.to_thread(self.web_socket.send, message)
         except (
             BrokenPipeError,
             OSError,
@@ -80,7 +85,7 @@ class NexoResource:
         self._callbacks.discard(callback)
 
     def publish_update(self, _loop) -> None:
-        for callback in self._callbacks:
+        for callback in tuple(self._callbacks):
             self._LOGGER.debug(
                 "Notifying HA about state change of device id: %s type: %s to state %s",
                 self.id,

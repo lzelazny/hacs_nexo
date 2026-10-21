@@ -2,11 +2,12 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
+import socket
 import threading
-import time
 from typing import Final
 
 import websocket
+from homeassistant.exceptions import HomeAssistantError
 
 from .nexo_analog_sensor import NexoAnalogSensor
 from .nexo_binary_sensor import NexoBinarySensor
@@ -14,6 +15,9 @@ from .nexo_blind import NexoBlind
 from .nexo_blind_group import NexoBlindGroup
 from .nexo_gate import NexoGate
 from .nexo_group_dimmer import NexoGroupDimmer
+from .nexo_dimmer import NexoDimmer
+from .nexo_group_led import NexoGroupLed
+from .nexo_group_output import NexoGroupOutput
 from .nexo_light import NexoLight
 from .nexo_light_dimmable import NexoDimmableLight
 from .nexo_output import NexoOutput
@@ -21,6 +25,7 @@ from .nexo_partition import NexoPartition
 from .nexo_resource import NexoResource
 from .nexo_temperature import NexoTemperature
 from .nexo_thermostat import NexoThermostat
+from .nexo_weather import NexoWeather
 
 
 NEXO_RESOURCE_TYPE_TEMPERATURE = "temperature"
@@ -49,6 +54,11 @@ class NexoBridge:
         self._keep_running = False
         self._ws_thread = None
         self._watchdog_task = None
+        self._stop_event = threading.Event()
+        self._weather = NexoWeather()
+        self._weather_listeners = set()
+        self._ext_commands = set()
+        self._command_listeners = set()
 
     def _run_websocket(self) -> None:
         """Pętla reconnect w osobnym wątku (bez rel)."""
@@ -74,15 +84,17 @@ class NexoBridge:
                     "Nexo WS disconnected. Reconnecting in %s s...",
                     NEXO_RECONNECT_TIMEOUT,
                 )
-                time.sleep(NEXO_RECONNECT_TIMEOUT)
+                self._stop_event.wait(NEXO_RECONNECT_TIMEOUT)
 
     async def _stop_ws_thread(self) -> None:
         """Zatrzymuje wątek WS bez blokowania Event Loop HA."""
         self._keep_running = False
+        self._stop_event.set()
 
-        if self.ws is not None:
+        web_socket = self.ws
+        if web_socket is not None:
             try:
-                self.ws.close()
+                await self._close_websocket(web_socket)
             except Exception:
                 pass
 
@@ -92,6 +104,32 @@ class NexoBridge:
                 self._executor,
                 lambda: self._ws_thread.join(timeout=5),
             )
+
+    async def _close_websocket(self, web_socket) -> None:
+        """Abort blocked I/O before a graceful close can wait for the send lock."""
+        web_socket.keep_running = False
+        connection = getattr(web_socket, "sock", None)
+        raw_socket = getattr(connection, "sock", None)
+
+        def close() -> None:
+            # websocket-client's close() sends a frame while holding its send lock.
+            # abort() shuts down the underlying socket without acquiring that lock,
+            # releasing blocked sends/receives before the close handshake begins.
+            # A peer close can clear connection.connected before taking that lock.
+            # Shut down the captured raw socket even when abort() would skip it.
+            if raw_socket is not None:
+                try:
+                    raw_socket.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+            if connection is not None:
+                try:
+                    connection.abort()
+                except OSError:
+                    pass
+            web_socket.close()
+
+        await asyncio.to_thread(close)
 
     async def connect(self) -> None:
         _LOGGER.info("Initializing Nexo connection...")
@@ -109,6 +147,7 @@ class NexoBridge:
 
         # Uruchom nowy wątek WS
         self._keep_running = True
+        self._stop_event.clear()
         self._ws_thread = threading.Thread(
             target=self._run_websocket,
             daemon=True,
@@ -120,6 +159,20 @@ class NexoBridge:
         # Uruchom watchdog
         self._watchdog_task = self._loop.create_task(self.async_watchdog())
 
+    async def disconnect(self) -> None:
+        """Stop reconnects, callbacks and background workers when an entry unloads."""
+        if self._watchdog_task is not None:
+            self._watchdog_task.cancel()
+            try:
+                await self._watchdog_task
+            except asyncio.CancelledError:
+                pass
+            self._watchdog_task = None
+        await self._stop_ws_thread()
+        self._executor.shutdown(wait=False)
+        self._weather_listeners.clear()
+        self._command_listeners.clear()
+
     async def async_watchdog(self) -> None:
         """
         Wysyła JSON ping co NEXO_PING_INTERVAL sekund.
@@ -128,11 +181,14 @@ class NexoBridge:
         while self._keep_running:
             await asyncio.sleep(NEXO_PING_INTERVAL)
 
-            if self.ws is None:
+            web_socket = self.ws
+            if web_socket is None:
                 continue
 
             try:
-                self.ws.send('{"type":"ping"}')
+                await self._loop.run_in_executor(
+                    self._executor, web_socket.send, '{"type":"ping"}'
+                )
                 _LOGGER.debug("Nexo WS: ping sent")
             except Exception as e:
                 _LOGGER.warning(
@@ -140,7 +196,7 @@ class NexoBridge:
                     e,
                 )
                 try:
-                    self.ws.close()
+                    await self._close_websocket(web_socket)
                 except Exception:
                     pass
                 await asyncio.sleep(NEXO_RECONNECT_TIMEOUT + 1)
@@ -155,16 +211,30 @@ class NexoBridge:
         while not self.initialized and t > 0:
             await asyncio.sleep(1)
             t -= 1
+        if not self.initialized:
+            raise TimeoutError("Timed out waiting for Nexo initial_data")
 
     def on_message(self, web_socket, message: str) -> None:
         _LOGGER.debug("Message: %s", message)
-        json_message = json.loads(message)
+        try:
+            json_message = json.loads(message)
+        except (ValueError, TypeError):
+            _LOGGER.warning("Ignoring invalid Nexo JSON message")
+            return
+        if not isinstance(json_message, dict):
+            return
 
         if json_message.get("op") == "initial_data":
             self.on_message_initial_data(json_message)
 
         if json_message.get("op") == "data_update":
             self.on_message_data_update(json_message)
+
+        if json_message.get("op") == "set_weather":
+            self.on_message_set_weather(json_message)
+
+        if json_message.get("op") == "modifications":
+            self.on_message_modifications(json_message)
 
     def on_message_initial_data(self, json_message: dict) -> None:
         if not self.raw_data_model and json_message:
@@ -213,6 +283,60 @@ class NexoBridge:
             )
         )
 
+    def get_weather_resources(self):
+        """Return the local station model, including before its first update."""
+        return [self._weather]
+
+    def register_weather_listener(self, callback) -> None:
+        self._weather_listeners.add(callback)
+
+    def unregister_weather_listener(self, callback) -> None:
+        self._weather_listeners.discard(callback)
+
+    def on_message_set_weather(self, message: dict) -> None:
+        data = message.get("data")
+        if not isinstance(data, dict):
+            return
+        self._weather.update_from_bridge(data)
+        for callback in tuple(self._weather_listeners):
+            self._loop.call_soon_threadsafe(callback)
+
+    def get_ext_commands(self) -> list[str]:
+        return sorted(self._ext_commands)
+
+    def register_command_listener(self, callback) -> None:
+        self._command_listeners.add(callback)
+
+    def unregister_command_listener(self, callback) -> None:
+        self._command_listeners.discard(callback)
+
+    def on_message_modifications(self, message: dict) -> None:
+        modifications = message.get("modifications")
+        if not isinstance(modifications, dict):
+            return
+        commands = modifications.get("ext_commands")
+        if not isinstance(commands, dict):
+            return
+        discovered = set()
+        for scope in ("to_system", "to_user"):
+            names = commands.get(scope)
+            if isinstance(names, dict):
+                discovered.update(name for name in names if isinstance(name, str) and name)
+        if discovered - self._ext_commands:
+            self._ext_commands.update(discovered)
+            for callback in tuple(self._command_listeners):
+                self._loop.call_soon_threadsafe(callback)
+
+    async def async_send_ext_command(self, command: str) -> None:
+        """Resolve the active socket for every press, including after reconnects."""
+        if self.ws is None:
+            raise HomeAssistantError("Nexo bridge is disconnected")
+        payload = json.dumps({"type": "ext_command", "cmd": command})
+        try:
+            await self._loop.run_in_executor(self._executor, self.ws.send, payload)
+        except (OSError, websocket.WebSocketException) as err:
+            raise HomeAssistantError("Unable to send command to Nexo bridge") from err
+
     def on_error(self, web_socket, error) -> None:
         _LOGGER.error("Nexo WS Error: %s", error)
 
@@ -235,6 +359,18 @@ class NexoBridge:
                     obj = NexoDimmableLight(self.ws, **nexo_resource)
                 else:
                     obj = NexoLight(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+
+            case "dimmer":
+                obj = NexoDimmer(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+
+            case "group_led":
+                obj = NexoGroupLed(self.ws, **nexo_resource)
+                self.resources[obj.id] = obj
+
+            case "group_output":
+                obj = NexoGroupOutput(self.ws, **nexo_resource)
                 self.resources[obj.id] = obj
 
             case "sensor":

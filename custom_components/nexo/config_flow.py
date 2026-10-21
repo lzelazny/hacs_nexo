@@ -7,11 +7,11 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import CONF_EXT_COMMANDS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,6 +65,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Create the per-entry external command options form."""
+        return NexoOptionsFlow(config_entry)
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -94,3 +100,27 @@ class CannotConnect(HomeAssistantError):
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
+
+
+class NexoOptionsFlow(config_entries.OptionsFlow):
+    """Allow manually configured commands when discovery is unavailable."""
+
+    def __init__(self, entry: config_entries.ConfigEntry) -> None:
+        self._entry = entry
+
+    async def async_step_init(self, user_input=None):
+        """Save comma separated command names and reload the integration."""
+        if user_input is not None:
+            commands = sorted(
+                {name.strip() for name in user_input.get(CONF_EXT_COMMANDS, "").split(",") if name.strip()}
+            )
+            return self.async_create_entry(
+                title="", data={**self._entry.options, CONF_EXT_COMMANDS: commands}
+            )
+        current = ", ".join(self._entry.options.get(CONF_EXT_COMMANDS, []))
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Optional(CONF_EXT_COMMANDS, default=current): str}
+            ),
+        )
