@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Connection settings updated."
     },
     "error": {
       "cannot_connect": "Failed to connect",
@@ -11,20 +12,43 @@
     "step": {
       "user": {
         "data": {
-          "host": "Host"
+          "host": "Host",
+          "port": "Port"
+        }
+      },
+      "reconfigure": {
+        "title": "Nexo connection",
+        "description": "Change the IP address or hostname and port of the Nexo bridge.",
+        "data": {
+          "host": "IP address or hostname",
+          "port": "Port"
         }
       }
     }
   },
   "options": {
     "step": {
-      "init": {
+      "commands": {
         "title": "Nexo commands",
         "description": "Enter comma separated external command names. Commands announced by the bridge are also added automatically.",
         "data": {
           "ext_commands": "External commands"
         }
+      },
+      "init": {
+        "title": "Nexo",
+        "menu_options": {
+          "commands": "Commands",
+          "inspect_json": "Inspect JSON"
+        }
+      },
+      "inspect_json": {
+        "title": "Inspect JSON",
+        "description": "[Open the latest init JSON inspector]({inspector_url}) to search, copy or download the last response from this bridge. No settings are changed."
       }
+    },
+    "abort": {
+      "inspector_closed": "Inspector closed. No settings were changed."
     }
   }
 }

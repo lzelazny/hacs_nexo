@@ -7,12 +7,15 @@ import logging
 from typing import Final
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN
+from .const import DEFAULT_PORT, DOMAIN
 from .nexoBridge import NexoBridge
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _LOGGER: Final = logging.getLogger(__name__)
 PLATFORMS: list[Platform | str] = [
@@ -29,12 +32,22 @@ PLATFORMS: list[Platform | str] = [
 ]
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register the shared JSON inspector and its admin API."""
+    from .inspector import async_setup_inspector
+
+    await async_setup_inspector(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up NexoBridge instance and initiate connectivity."""
+    if entry.title == "Name of the device":
+        hass.config_entries.async_update_entry(entry, title="Karta MM")
     nexo = None
     try:
         ip = dict(entry.data)[CONF_HOST]
-        nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip)
+        nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip, entry.data.get(CONF_PORT, DEFAULT_PORT))
         _LOGGER.info("Connecting to multimedia card on IP: %s", ip)
 
         await nexo.connect()

@@ -20,11 +20,13 @@ def _load_modules():
     package.__path__ = [str(root)]
     stubs = {name: package}
     for module in ("homeassistant", "homeassistant.config_entries", "homeassistant.const",
-                   "homeassistant.core", "homeassistant.exceptions", "websocket"):
+                   "homeassistant.core", "homeassistant.exceptions", "homeassistant.helpers", "websocket"):
         stubs[module] = ModuleType(module)
+    stubs["homeassistant.helpers"].config_validation = SimpleNamespace(config_entry_only_config_schema=lambda domain: {})
     stubs["homeassistant.config_entries"].ConfigEntry = SimpleNamespace
     stubs["homeassistant.core"].HomeAssistant = SimpleNamespace
     stubs["homeassistant.const"].CONF_HOST = "host"
+    stubs["homeassistant.const"].CONF_PORT = "port"
     stubs["homeassistant.const"].Platform = StrEnum("Platform", {
         x: x.lower() for x in ("ALARM_CONTROL_PANEL", "BINARY_SENSOR", "CLIMATE",
                               "COVER", "LIGHT", "LOCK", "SENSOR", "SWITCH", "WEATHER", "BUTTON")
@@ -210,7 +212,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         hass = SimpleNamespace(data={"nexo": {"test": client}}, config_entries=SimpleNamespace(
             async_unload_platforms=AsyncMock(return_value=unload),
             async_forward_entry_setups=AsyncMock(), async_reload=AsyncMock()))
-        entry = SimpleNamespace(entry_id="test", data={"host": "192.0.2.1"},
+        entry = SimpleNamespace(entry_id="test", title="Karta MM", data={"host": "192.0.2.1"},
                                 async_on_unload=Mock(), add_update_listener=Mock())
         return hass, entry, client
 
@@ -235,6 +237,21 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         client.disconnect.assert_awaited_once()
         hass.config_entries.async_forward_entry_setups.assert_not_awaited()
         self.assertNotIn("test", hass.data["nexo"])
+
+    async def test_setup_renames_old_placeholder_title(self):
+        hass, entry, client = self.make_hass()
+        entry.title = "Name of the device"
+        hass.config_entries.async_update_entry = Mock()
+        with patch.object(ENTRY, "NexoBridge", return_value=client):
+            self.assertTrue(await ENTRY.async_setup_entry(hass, entry))
+        hass.config_entries.async_update_entry.assert_called_once_with(entry, title="Karta MM")
+
+    async def test_setup_passes_custom_port_to_bridge(self):
+        hass, entry, client = self.make_hass()
+        entry.data["port"] = 9000
+        with patch.object(ENTRY, "NexoBridge", return_value=client) as factory:
+            self.assertTrue(await ENTRY.async_setup_entry(hass, entry))
+        factory.assert_called_once_with("192.0.2.1", 9000)
 
     async def test_options_listener_registered_and_reloads_entry(self):
         hass, entry, client = self.make_hass()

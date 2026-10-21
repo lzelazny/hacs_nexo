@@ -1,4 +1,6 @@
 import asyncio
+from copy import deepcopy
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
@@ -9,6 +11,7 @@ from typing import Final
 import websocket
 from homeassistant.exceptions import HomeAssistantError
 
+from .const import DEFAULT_PORT
 from .nexo_analog_sensor import NexoAnalogSensor
 from .nexo_binary_sensor import NexoBinarySensor
 from .nexo_blind import NexoBlind
@@ -41,11 +44,14 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 
 class NexoBridge:
-    def __init__(self, local_ip) -> None:
+    def __init__(self, local_ip, port=DEFAULT_PORT) -> None:
         self.ws = None
         self.resources = {}
         self.local_ip = local_ip
+        self.port = port
         self.raw_data_model = {}
+        self.latest_initial_data = (None, None)
+        self.connected = False
         self.initialized = False
 
         self._loop = asyncio.get_running_loop()
@@ -64,10 +70,10 @@ class NexoBridge:
         """Pętla reconnect w osobnym wątku (bez rel)."""
         while self._keep_running:
             try:
-                _LOGGER.info("Connecting to Nexo... %s:8766", self.local_ip)
+                _LOGGER.info("Connecting to Nexo... %s:%s", self.local_ip, self.port)
 
                 self.ws = websocket.WebSocketApp(
-                    f"ws://{self.local_ip}:8766/",
+                    f"ws://{self.local_ip}:{self.port}/",
                     on_open=self.on_open,
                     on_message=self.on_message,
                     on_error=self.on_error,
@@ -79,6 +85,7 @@ class NexoBridge:
             except Exception as e:
                 _LOGGER.error("WebSocket runtime error: %s", e)
 
+            self.connected = False
             if self._keep_running:
                 _LOGGER.warning(
                     "Nexo WS disconnected. Reconnecting in %s s...",
@@ -161,6 +168,7 @@ class NexoBridge:
 
     async def disconnect(self) -> None:
         """Stop reconnects, callbacks and background workers when an entry unloads."""
+        self.connected = False
         if self._watchdog_task is not None:
             self._watchdog_task.cancel()
             try:
@@ -202,6 +210,7 @@ class NexoBridge:
                 await asyncio.sleep(NEXO_RECONNECT_TIMEOUT + 1)
 
     def on_open(self, web_socket) -> None:
+        self.connected = True
         _LOGGER.info("Nexo integration started / reconnected")
         if self.initialized:
             self.refresh_resources()
@@ -237,6 +246,9 @@ class NexoBridge:
             self.on_message_modifications(json_message)
 
     def on_message_initial_data(self, json_message: dict) -> None:
+        self.latest_initial_data = (
+            datetime.now(timezone.utc).isoformat(), deepcopy(json_message)
+        )
         if not self.raw_data_model and json_message:
             self.raw_data_model = json_message
             self.update_resources()
@@ -341,6 +353,7 @@ class NexoBridge:
         _LOGGER.error("Nexo WS Error: %s", error)
 
     def on_close(self, web_socket, close_status_code, close_msg) -> None:
+        self.connected = False
         _LOGGER.warning("Nexo WebSocket closed: %s", close_msg)
 
     def add_resource(self, nexo_resource: dict) -> None:

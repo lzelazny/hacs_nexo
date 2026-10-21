@@ -11,11 +11,22 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import CONF_EXT_COMMANDS, DOMAIN
+from .const import CONF_EXT_COMMANDS, DEFAULT_PORT, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema({vol.Required("host"): str})
+def connection_schema(data=None):
+    """Build connection fields for new and existing entries."""
+    data = data or {}
+    return vol.Schema({
+        vol.Required("host", default=data.get("host", "")): str,
+        vol.Required("port", default=data.get("port", DEFAULT_PORT)): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=65535)
+        ),
+    })
+
+
+STEP_USER_DATA_SCHEMA = connection_schema()
 
 
 class PlaceholderHub:
@@ -57,7 +68,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # InvalidAuth
 
     # Return info that you want to store in the config entry.
-    return {"title": "Name of the device"}
+    return {"title": "Karta MM"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -70,6 +81,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         """Create the per-entry external command options form."""
         return NexoOptionsFlow(config_entry)
+
+    async def async_step_reconfigure(self, user_input=None) -> FlowResult:
+        """Update connection settings without replacing the entry."""
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            # The existing update listener reloads after saving.
+            changed = self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, **user_input}
+            )
+            # Failed setup has no update listener; retry the connection explicitly.
+            if not changed or entry.entry_id not in self.hass.data.get(DOMAIN, {}):
+                await self.hass.config_entries.async_reload(entry.entry_id)
+            return self.async_abort(reason="reconfigure_successful")
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=connection_schema(entry.data)
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -109,6 +136,24 @@ class NexoOptionsFlow(config_entries.OptionsFlow):
         self._entry = entry
 
     async def async_step_init(self, user_input=None):
+        """Choose command configuration or the latest JSON inspector."""
+        return self.async_show_menu(
+            step_id="init", menu_options=["commands", "inspect_json"]
+        )
+
+    async def async_step_inspect_json(self, user_input=None):
+        """Link to the inspector for this specific bridge without saving options."""
+        if user_input is not None:
+            return self.async_abort(reason="inspector_closed")
+        return self.async_show_form(
+            step_id="inspect_json",
+            description_placeholders={
+                "inspector_url": f"/nexo-inspector?config_entry={self._entry.entry_id}"
+            },
+            last_step=True,
+        )
+
+    async def async_step_commands(self, user_input=None):
         """Save comma separated command names and reload the integration."""
         if user_input is not None:
             commands = sorted(
@@ -119,7 +164,7 @@ class NexoOptionsFlow(config_entries.OptionsFlow):
             )
         current = ", ".join(self._entry.options.get(CONF_EXT_COMMANDS, []))
         return self.async_show_form(
-            step_id="init",
+            step_id="commands",
             data_schema=vol.Schema(
                 {vol.Optional(CONF_EXT_COMMANDS, default=current): str}
             ),
