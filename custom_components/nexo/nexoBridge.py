@@ -90,9 +90,10 @@ class NexoBridge:
         self._keep_running = False
         self._stop_event.set()
 
-        if self.ws is not None:
+        web_socket = self.ws
+        if web_socket is not None:
             try:
-                await asyncio.to_thread(self.ws.close)
+                await self._close_websocket(web_socket)
             except Exception:
                 pass
 
@@ -102,6 +103,24 @@ class NexoBridge:
                 self._executor,
                 lambda: self._ws_thread.join(timeout=5),
             )
+
+    async def _close_websocket(self, web_socket) -> None:
+        """Abort blocked I/O before a graceful close can wait for the send lock."""
+        web_socket.keep_running = False
+
+        def close() -> None:
+            # websocket-client's close() sends a frame while holding its send lock.
+            # abort() shuts down the underlying socket without acquiring that lock,
+            # releasing blocked sends/receives before the close handshake begins.
+            socket = getattr(web_socket, "sock", None)
+            if socket is not None:
+                try:
+                    socket.abort()
+                except OSError:
+                    pass
+            web_socket.close()
+
+        await asyncio.to_thread(close)
 
     async def connect(self) -> None:
         _LOGGER.info("Initializing Nexo connection...")
@@ -153,12 +172,13 @@ class NexoBridge:
         while self._keep_running:
             await asyncio.sleep(NEXO_PING_INTERVAL)
 
-            if self.ws is None:
+            web_socket = self.ws
+            if web_socket is None:
                 continue
 
             try:
                 await self._loop.run_in_executor(
-                    self._executor, self.ws.send, '{"type":"ping"}'
+                    self._executor, web_socket.send, '{"type":"ping"}'
                 )
                 _LOGGER.debug("Nexo WS: ping sent")
             except Exception as e:
@@ -167,7 +187,7 @@ class NexoBridge:
                     e,
                 )
                 try:
-                    await asyncio.to_thread(self.ws.close)
+                    await self._close_websocket(web_socket)
                 except Exception:
                     pass
                 await asyncio.sleep(NEXO_RECONNECT_TIMEOUT + 1)

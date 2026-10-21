@@ -141,18 +141,47 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_disconnect_can_close_socket_while_a_send_is_blocked(self):
         started, release = threading.Event(), threading.Event()
+        send_lock = threading.Lock()
+        closed = threading.Event()
+        calls = []
         def send(_payload):
-            started.set()
-            release.wait(3)
-        self.bridge.ws = SimpleNamespace(send=send, close=release.set)
+            with send_lock:
+                started.set()
+                release.wait(3)
+        def abort():
+            calls.append("abort")
+            release.set()
+        def close():
+            # The real websocket-client close handshake acquires the send lock.
+            with send_lock:
+                calls.append("close")
+                closed.set()
+        web_socket = SimpleNamespace(
+            send=send, close=close, sock=SimpleNamespace(abort=abort), keep_running=True
+        )
+        self.bridge.ws = web_socket
         command = asyncio.create_task(self.bridge.async_send_ext_command("open"))
         try:
             self.assertTrue(await asyncio.to_thread(started.wait, 1))
             await asyncio.wait_for(self.bridge.disconnect(), timeout=1)
             await command
+            self.assertTrue(closed.is_set())
+            self.assertFalse(web_socket.keep_running)
+            self.assertEqual(calls, ["abort", "close"])
         finally:
             release.set()
             await command
+
+    async def test_closure_keeps_the_captured_socket_during_reconnect(self):
+        old_socket = SimpleNamespace(
+            sock=SimpleNamespace(abort=Mock()), close=Mock(), keep_running=True
+        )
+        new_socket = Mock()
+        self.bridge.ws = new_socket
+        await self.bridge._close_websocket(old_socket)
+        old_socket.sock.abort.assert_called_once()
+        old_socket.close.assert_called_once()
+        new_socket.close.assert_not_called()
 
 
 class EntryTests(unittest.IsolatedAsyncioTestCase):
