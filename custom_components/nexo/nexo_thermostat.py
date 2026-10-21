@@ -10,6 +10,8 @@ class NexoThermostat(NexoTemperature):
 
     _NONE_VALUE: Final = 32767
 
+    # Keep the constructor compatible with the bridge JSON min/max keys.
+    # pylint: disable-next=redefined-builtin
     def __init__(self, web_socket, min, max, *args, **kwargs) -> None:
         """Initialize the Nexo thermostat resource."""
         super().__init__(web_socket, *args, **kwargs)

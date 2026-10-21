@@ -1,0 +1,17 @@
+[MAIN]
+py-version=3.14
+
+[MESSAGES CONTROL]
+# Home Assistant marks optional entity capabilities abstract; integrations expose
+# only the operations supported by each device through supported_features.
+disable=abstract-method
+
+[BASIC]
+good-names=CONFIG_SCHEMA
+
+[DESIGN]
+# The websocket bridge owns transport state and the supported resource factory.
+max-attributes=20
+max-public-methods=30
+max-branches=25
+max-locals=20

@@ -38,7 +38,7 @@ class HANexoBlind(HANexo, CoverEntity):
     def __init__(self, nexo_blind) -> None:
         """Initialize the Nexo blind."""
         super().__init__(nexo_resource=nexo_blind)
-        self._nexo_Blind: NexoBlind = nexo_blind
+        self._nexo_blind: NexoBlind = nexo_blind
         self._attr_supported_features = (
             CoverEntityFeature.CLOSE
             | CoverEntityFeature.OPEN
@@ -54,35 +54,35 @@ class HANexoBlind(HANexo, CoverEntity):
     @property
     def current_cover_position(self):
         """Return the current position of the cover."""
-        return self._nexo_Blind.openPercentage
+        return self._nexo_blind.open_percentage
 
     @property
     def is_closed(self) -> bool | None:
         """Return if the cover is closed or not."""
-        return self._nexo_Blind.is_closed
+        return self._nexo_blind.is_closed
 
     @property
     def is_closing(self) -> bool | None:
         """Return if the cover is closed or not."""
-        return self._nexo_Blind.is_closing
+        return self._nexo_blind.is_closing
 
     @property
     def is_opening(self) -> bool | None:
         """Return if the cover is closed or not."""
-        return self._nexo_Blind.is_opening
+        return self._nexo_blind.is_opening
 
-    async def async_open_cover(self):
+    async def async_open_cover(self, **kwargs):
         """Open the cover."""
-        await self._nexo_Blind.async_open()
+        await self._nexo_blind.async_open()
 
-    async def async_close_cover(self):
+    async def async_close_cover(self, **kwargs):
         """Close cover."""
-        await self._nexo_Blind.async_close()
+        await self._nexo_blind.async_close()
 
-    async def async_stop_cover(self):
+    async def async_stop_cover(self, **kwargs):
         """Stop the cover."""
-        await self._nexo_Blind.async_stop()
+        await self._nexo_blind.async_stop()
 
-    async def async_set_cover_position(self, position):
+    async def async_set_cover_position(self, **kwargs):
         """Move the cover to a specific position."""
-        await self._nexo_Blind.async_setLevel(position)
+        await self._nexo_blind.async_set_level(kwargs["position"])

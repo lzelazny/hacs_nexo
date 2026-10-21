@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 from typing import Final
 
@@ -12,6 +13,9 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 class HANexo:
     """Base for Home Assistant Nexo Entity."""
+
+    # Entity subclasses provide the state-writing callback used by this mixin.
+    async_write_ha_state: Callable[[], None]
 
     def __init__(self, nexo_resource) -> None:
         """Initialize the Nexo resource."""

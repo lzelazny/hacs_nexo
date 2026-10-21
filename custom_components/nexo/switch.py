@@ -36,17 +36,17 @@ class HANexoSwitch(HANexo, SwitchEntity):
     def __init__(self, nexo_output) -> None:
         """Initialize the Nexo switch."""
         super().__init__(nexo_resource=nexo_output)
-        self._nexo_Output: NexoOutput = nexo_output
+        self._nexo_output: NexoOutput = nexo_output
 
     @property
     def is_on(self) -> bool:
         """Return the state of the switch."""
-        return self._nexo_Output.is_on
+        return self._nexo_output.is_on
 
     async def async_turn_on(self, **kwargs):
         """Turn the entity on."""
-        await self._nexo_Output.async_turn_on()
+        await self._nexo_output.async_turn_on()
 
     async def async_turn_off(self, **kwargs):
         """Turn the entity off."""
-        await self._nexo_Output.async_turn_off()
+        await self._nexo_output.async_turn_off()

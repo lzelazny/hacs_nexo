@@ -81,6 +81,6 @@ class HANexoClimate(HANexo, ClimateEntity):
         else:
             await self._nexo_termostat.async_turn_on()
 
-    async def async_set_temperature(self, temperature, **kwargs):
+    async def async_set_temperature(self, **kwargs):
         """Set the target temperature."""
-        await self._nexo_termostat.async_set_value(temperature)
+        await self._nexo_termostat.async_set_value(kwargs["temperature"])
