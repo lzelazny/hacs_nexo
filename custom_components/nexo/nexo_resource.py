@@ -14,7 +14,9 @@ class NexoResource:
 
     _LOGGER: Final = logging.getLogger(__name__)
 
-    def __init__(self, web_socket, id, name, state, *args, **kwargs) -> None:
+    # The bridge payload supplies the keyword "id".
+    # pylint: disable-next=redefined-builtin
+    def __init__(self, web_socket, id, name, state, *_args, **_kwargs) -> None:
         """Initialize the Nexo resource."""
         self.web_socket: websocket = web_socket
         self._id = id
@@ -24,10 +26,12 @@ class NexoResource:
 
     @property
     def id(self) -> str:
+        """Return the bridge resource identifier."""
         return self._id
 
     @property
     def name(self) -> str:
+        """Return the resource display name."""
         return self._name
 
     async def _wrapper(self, callback):
@@ -36,7 +40,7 @@ class NexoResource:
             result = callback()
             if inspect.isawaitable(result):
                 await result
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             self._LOGGER.exception("Nexo resource callback failed for %s", self.id)
 
     async def _async_send(self, message) -> None:
@@ -56,7 +60,7 @@ class NexoResource:
                 self._name,
                 ex,
             )
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-exception-caught
             self._LOGGER.error(
                 "Nexo WS: unexpected send error for resource id=%s: %s",
                 self._id,
@@ -79,12 +83,15 @@ class NexoResource:
             await self._async_send_cmd_operation_custom(operation, value=value)
 
     def register_callback(self, callback: Callable[[], None]) -> None:
+        """Register an entity callback for resource state changes."""
         self._callbacks.add(callback)
 
     def remove_callback(self, callback: Callable[[], None]) -> None:
+        """Remove a previously registered entity callback."""
         self._callbacks.discard(callback)
 
     def publish_update(self, _loop) -> None:
+        """Schedule callbacks on the Home Assistant event loop."""
         for callback in tuple(self._callbacks):
             self._LOGGER.debug(
                 "Notifying HA about state change of device id: %s type: %s to state %s",

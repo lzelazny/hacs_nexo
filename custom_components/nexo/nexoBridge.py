@@ -1,3 +1,7 @@
+"""Nexo websocket connection, resource discovery and reconnect lifecycle."""
+
+# Preserve the existing import path used by the integration.
+# pylint: disable=invalid-name
 import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -44,6 +48,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 
 class NexoBridge:
+    """Maintain the socket and dispatch bridge messages to local resource models."""
     def __init__(self, local_ip, port=DEFAULT_PORT) -> None:
         self.ws = None
         self.resources = {}
@@ -82,7 +87,7 @@ class NexoBridge:
                 # Bez ping_* – watchdog wysyła JSON ping (text frame)
                 self.ws.run_forever()
 
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 _LOGGER.error("WebSocket runtime error: %s", e)
 
             self.connected = False
@@ -102,7 +107,7 @@ class NexoBridge:
         if web_socket is not None:
             try:
                 await self._close_websocket(web_socket)
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
         if self._ws_thread is not None and self._ws_thread.is_alive():
@@ -139,6 +144,7 @@ class NexoBridge:
         await asyncio.to_thread(close)
 
     async def connect(self) -> None:
+        """Start the websocket worker and wait for initial resources."""
         _LOGGER.info("Initializing Nexo connection...")
 
         # Zatrzymaj poprzedni wątek jeśli istnieje
@@ -198,24 +204,26 @@ class NexoBridge:
                     self._executor, web_socket.send, '{"type":"ping"}'
                 )
                 _LOGGER.debug("Nexo WS: ping sent")
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 _LOGGER.warning(
                     "Nexo WS: ping failed (%s) — forcing reconnect",
                     e,
                 )
                 try:
                     await self._close_websocket(web_socket)
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     pass
                 await asyncio.sleep(NEXO_RECONNECT_TIMEOUT + 1)
 
-    def on_open(self, web_socket) -> None:
+    def on_open(self, _web_socket) -> None:
+        """Mark the connection open and refresh resource socket references."""
         self.connected = True
         _LOGGER.info("Nexo integration started / reconnected")
         if self.initialized:
             self.refresh_resources()
 
     async def wait_for_initial_resources_load(self, timeout: int) -> None:
+        """Wait for initial resources or fail setup after the timeout."""
         t = timeout
         while not self.initialized and t > 0:
             await asyncio.sleep(1)
@@ -223,7 +231,8 @@ class NexoBridge:
         if not self.initialized:
             raise TimeoutError("Timed out waiting for Nexo initial_data")
 
-    def on_message(self, web_socket, message: str) -> None:
+    def on_message(self, _web_socket, message: str) -> None:
+        """Dispatch a decoded bridge message by operation."""
         _LOGGER.debug("Message: %s", message)
         try:
             json_message = json.loads(message)
@@ -246,6 +255,7 @@ class NexoBridge:
             self.on_message_modifications(json_message)
 
     def on_message_initial_data(self, json_message: dict) -> None:
+        """Retain the latest init response and initialize or refresh resources."""
         self.latest_initial_data = (
             datetime.now(timezone.utc).isoformat(), deepcopy(json_message)
         )
@@ -256,6 +266,7 @@ class NexoBridge:
             self.refresh_resources()
 
     def update_resources(self) -> None:
+        """Create resource objects from the first initialization response."""
         self.initialized = False
         self.resources.clear()
 
@@ -265,15 +276,18 @@ class NexoBridge:
         self.initialized = True
 
     def add_weather_station(self, weather_station: dict) -> None:
+        """Add resources announced by a weather station."""
         if weather_station and len(weather_station.keys()) > 0:
             for resource_id in dict(weather_station):
                 self.add_resource(weather_station[resource_id])
 
     def refresh_resources(self) -> None:
+        """Attach existing resources to the current websocket."""
         for resource in self.resources.values():
             resource.web_socket = self.ws
 
     def on_message_data_update(self, json_message: dict) -> None:
+        """Apply resource state changes and notify entity callbacks."""
         if "resources" in json_message:
             for res in json_message["resources"]:
                 res_obj = json_message["resources"][res]
@@ -283,14 +297,16 @@ class NexoBridge:
                     resource.publish_update(self._loop)
 
     def get_resource_by_id(self, resource_id) -> NexoResource | None:
+        """Look up a resource by its bridge identifier."""
         if int(resource_id) in self.resources:
             return self.resources[int(resource_id)]
         return None
 
     def get_resources_by_type(self, resource_type):
+        """Return resources with exactly the requested concrete type."""
         return list(
             filter(
-                lambda x: type(x) is resource_type,
+                lambda x: x.__class__ is resource_type,
                 list(self.resources.values()),
             )
         )
@@ -300,12 +316,15 @@ class NexoBridge:
         return [self._weather]
 
     def register_weather_listener(self, callback) -> None:
+        """Register a listener for weather observations."""
         self._weather_listeners.add(callback)
 
     def unregister_weather_listener(self, callback) -> None:
+        """Remove a weather observation listener."""
         self._weather_listeners.discard(callback)
 
     def on_message_set_weather(self, message: dict) -> None:
+        """Apply weather observations and notify listeners."""
         data = message.get("data")
         if not isinstance(data, dict):
             return
@@ -314,15 +333,19 @@ class NexoBridge:
             self._loop.call_soon_threadsafe(callback)
 
     def get_ext_commands(self) -> list[str]:
+        """Return the discovered external command names."""
         return sorted(self._ext_commands)
 
     def register_command_listener(self, callback) -> None:
+        """Register a listener for newly discovered commands."""
         self._command_listeners.add(callback)
 
     def unregister_command_listener(self, callback) -> None:
+        """Remove a command discovery listener."""
         self._command_listeners.discard(callback)
 
     def on_message_modifications(self, message: dict) -> None:
+        """Discover external commands announced in modification messages."""
         modifications = message.get("modifications")
         if not isinstance(modifications, dict):
             return
@@ -349,14 +372,17 @@ class NexoBridge:
         except (OSError, websocket.WebSocketException) as err:
             raise HomeAssistantError("Unable to send command to Nexo bridge") from err
 
-    def on_error(self, web_socket, error) -> None:
+    def on_error(self, _web_socket, error) -> None:
+        """Log a websocket transport error."""
         _LOGGER.error("Nexo WS Error: %s", error)
 
-    def on_close(self, web_socket, close_status_code, close_msg) -> None:
+    def on_close(self, _web_socket, _close_status_code, close_msg) -> None:
+        """Mark the websocket disconnected and log its close reason."""
         self.connected = False
         _LOGGER.warning("Nexo WebSocket closed: %s", close_msg)
 
     def add_resource(self, nexo_resource: dict) -> None:
+        """Create the resource model matching the announced bridge type."""
         nexo_resource_type = nexo_resource["type"]
 
         match nexo_resource_type:

@@ -32,9 +32,10 @@ PLATFORMS: list[Platform | str] = [
 ]
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
     """Register the shared JSON inspector and its admin API."""
-    from .inspector import async_setup_inspector
+    # Load frontend support only during integration setup.
+    from .inspector import async_setup_inspector  # pylint: disable=import-outside-toplevel
 
     await async_setup_inspector(hass)
     return True
@@ -47,7 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     nexo = None
     try:
         ip = dict(entry.data)[CONF_HOST]
-        nexo = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NexoBridge(ip, entry.data.get(CONF_PORT, DEFAULT_PORT))
+        nexo = NexoBridge(ip, entry.data.get(CONF_PORT, DEFAULT_PORT))
+        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = nexo
         _LOGGER.info("Connecting to multimedia card on IP: %s", ip)
 
         await nexo.connect()

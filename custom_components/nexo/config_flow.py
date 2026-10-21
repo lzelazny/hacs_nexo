@@ -29,45 +29,8 @@ def connection_schema(data=None):
 STEP_USER_DATA_SCHEMA = connection_schema()
 
 
-class PlaceholderHub:
-    """Placeholder class to make tests pass.
-
-    TODO Remove this placeholder class and replace with things from your PyPI package.
-    """
-
-    def __init__(self, host: str) -> None:
-        """Initialize."""
-        self.host = host
-
-    async def authenticate(self, username: str, password: str) -> bool:
-        """Test if we can authenticate with the host."""
-        return True
-
-
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
-    # TODO validate the data can be used to set up a connection.
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data["username"], data["password"]
-    # )
-
-    hub = PlaceholderHub(data["host"])
-
-    # if not await hub.authenticate(data["username"], data["password"]):
-    #   raise InvalidAuth
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
-
-    # Return info that you want to store in the config entry.
+async def validate_input(_hass: HomeAssistant, _data: dict[str, Any]) -> dict[str, Any]:
+    """Return entry metadata; connectivity is checked during entry setup."""
     return {"title": "Karta MM"}
 
 
@@ -135,7 +98,7 @@ class NexoOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry: config_entries.ConfigEntry) -> None:
         self._entry = entry
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(self, _user_input=None):
         """Choose command configuration or the latest JSON inspector."""
         return self.async_show_menu(
             step_id="init", menu_options=["commands", "inspect_json"]
@@ -157,7 +120,11 @@ class NexoOptionsFlow(config_entries.OptionsFlow):
         """Save comma separated command names and reload the integration."""
         if user_input is not None:
             commands = sorted(
-                {name.strip() for name in user_input.get(CONF_EXT_COMMANDS, "").split(",") if name.strip()}
+                {
+                    name.strip()
+                    for name in user_input.get(CONF_EXT_COMMANDS, "").split(",")
+                    if name.strip()
+                }
             )
             return self.async_create_entry(
                 title="", data={**self._entry.options, CONF_EXT_COMMANDS: commands}

@@ -59,10 +59,10 @@ class HANexoGate(HANexo, LockEntity):
         """Return the state of the gate."""
         return self._last_is_open & self._nexo_gate.is_open is None
 
-    async def async_unlock(self):
-        """Unlock all or specified locks. A code to unlock the lock with may optionally be specified."""
+    async def async_unlock(self, **kwargs):
+        """Toggle the Nexo gate to unlock it."""
         await self._nexo_gate.async_toggle()
 
-    async def async_lock(self):
-        """Lock all or specified locks. A code to lock the lock with may optionally be specified."""
+    async def async_lock(self, **kwargs):
+        """Toggle the Nexo gate to lock it."""
         await self._nexo_gate.async_toggle()

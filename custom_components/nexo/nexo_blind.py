@@ -30,7 +30,7 @@ class NexoBlind(NexoResource):
         """Stop the blind."""
         await self._async_send_cmd(self._get_cmd(BlindOperation.STOP.value))
 
-    async def async_setLevel(self, level) -> None:
+    async def async_set_level(self, level) -> None:
         """Set the blind level."""
         await self._async_send_cmd(
             self._get_cmd_position(BlindOperation.SET_LEVEL.value, level)
@@ -52,7 +52,7 @@ class NexoBlind(NexoResource):
         return self.state["blind_op"]
 
     @property
-    def openPercentage(self) -> int:
+    def open_percentage(self) -> int:
         """Return the open percentage of the blind."""
         return 100 - self._blind_level
 
