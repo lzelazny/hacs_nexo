@@ -15,6 +15,7 @@
 - Run Pylint CI with Python 3.14 and installed runtime dependencies.
 
 ### Fixed
+- Use `native_target_temperature` and expose thermostat limits as `min_temp`/`max_temp` in the climate entity (the former `target_temperature` is deprecated and stops working in Home Assistant 2027.11).
 - Version frontend assets by content so updated control pages use a new JavaScript URL.
 - Align cover, lock and climate action signatures with Home Assistant and resolve integration Pylint diagnostics.
 - Preserve existing light and switch entity IDs while adding new resource types.

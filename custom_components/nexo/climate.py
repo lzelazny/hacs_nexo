@@ -49,8 +49,8 @@ class HANexoClimate(HANexo, ClimateEntity):
             HVACAction.HEATING,
             HVACAction.OFF,
         ]
-        self._attr_target_temperature_low = nexo_termostat.min
-        self._attr_target_temperature_high = nexo_termostat.max
+        self._attr_min_temp = nexo_termostat.min
+        self._attr_max_temp = nexo_termostat.max
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     @property
