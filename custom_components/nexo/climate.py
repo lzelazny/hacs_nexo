@@ -49,8 +49,8 @@ class HANexoClimate(HANexo, ClimateEntity):
             HVACAction.HEATING,
             HVACAction.OFF,
         ]
-        self._attr_target_temperature_low = nexo_termostat.min
-        self._attr_target_temperature_high = nexo_termostat.max
+        self._attr_min_temp = nexo_termostat.min
+        self._attr_max_temp = nexo_termostat.max
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     @property
@@ -70,8 +70,8 @@ class HANexoClimate(HANexo, ClimateEntity):
         return HVACAction.HEATING
 
     @property
-    def target_temperature(self) -> float:
-        """Return the current temperature."""
+    def native_target_temperature(self) -> float:
+        """Return the target temperature."""
         return self._nexo_termostat.value
 
     async def async_set_hvac_mode(self, hvac_mode):
