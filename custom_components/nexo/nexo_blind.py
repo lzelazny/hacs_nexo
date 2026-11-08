@@ -21,10 +21,25 @@ class BlindOperation(Enum):
 class NexoBlind(NexoResource):
     """Nexo blind resource."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    # time_up/time_down are the module's configured run times; it stops on its own after them.
+    def __init__(self, *args, time_up=None, time_down=None, **kwargs) -> None:
         """Initialize the Nexo blind."""
         super().__init__(*args, **kwargs)
+        self._time_up = time_up
+        self._time_down = time_down
         self._position_seen = False
+
+    @property
+    def run_time(self) -> int | None:
+        """Return the seconds the current movement lasts, or None when idle or unknown."""
+        return {
+            BlindOperation.CLOSE.value: self._time_down,
+            BlindOperation.OPEN.value: self._time_up,
+        }.get(self._blind_op)
+
+    def mark_stopped(self) -> None:
+        """Record the module's automatic stop, which it does not report."""
+        self.state = {**self.state, "blind_op": BlindOperation.STOP.value}
 
     async def async_close(self) -> None:
         """Close the blind."""
