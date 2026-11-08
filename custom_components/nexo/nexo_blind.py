@@ -4,6 +4,9 @@ from enum import Enum
 
 from .nexo_resource import NexoResource
 
+# The module reports 255 as blind_target when it has no position feedback.
+NO_POSITION = 255
+
 
 class BlindOperation(Enum):
     """Enum for blind operations."""
@@ -17,6 +20,11 @@ class BlindOperation(Enum):
 
 class NexoBlind(NexoResource):
     """Nexo blind resource."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the Nexo blind."""
+        super().__init__(*args, **kwargs)
+        self._position_seen = False
 
     async def async_close(self) -> None:
         """Close the blind."""
@@ -50,6 +58,17 @@ class NexoBlind(NexoResource):
     @property
     def _blind_op(self) -> int:
         return self.state["blind_op"]
+
+    @property
+    def has_position(self) -> bool:
+        """Return False until the module shows it reports a position.
+
+        An idle blind with a position reports the same 255 and level 0 as a time-only
+        module, so position support is latched once a real value has been seen.
+        """
+        if self.state.get("blind_target") != NO_POSITION or self._blind_level != 0:
+            self._position_seen = True
+        return self._position_seen
 
     @property
     def open_percentage(self) -> int:

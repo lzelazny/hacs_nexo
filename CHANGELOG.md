@@ -15,6 +15,7 @@
 - Run Pylint CI with Python 3.14 and installed runtime dependencies.
 
 ### Fixed
+- Keep open and close enabled for blinds whose module reports no position (`blind_target` 255) instead of showing them as fully open (#4, #28).
 - Version frontend assets by content so updated control pages use a new JavaScript URL.
 - Align cover, lock and climate action signatures with Home Assistant and resolve integration Pylint diagnostics.
 - Preserve existing light and switch entity IDs while adding new resource types.

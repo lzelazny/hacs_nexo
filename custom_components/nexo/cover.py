@@ -47,6 +47,11 @@ class HANexoBlind(HANexo, CoverEntity):
         )
 
     @property
+    def assumed_state(self) -> bool:
+        """Keep open and close enabled when the position is unknown."""
+        return not self._nexo_blind.has_position
+
+    @property
     def device_class(self) -> str:
         """Return the device class of this cover."""
         return CoverDeviceClass.BLIND
